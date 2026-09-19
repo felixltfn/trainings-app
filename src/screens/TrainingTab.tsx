@@ -50,6 +50,7 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
   const next = templates.find((t) => t.id === nextId);
   const exportDue = workoutCount > 0 && (!lastExport || Date.now() - lastExport > 14 * DAY_MS);
   const start = (id: number) => startWorkout(id);
+  const exerciseCount = (n: number | undefined) => `${n ?? 0} ${n === 1 ? 'Übung' : 'Übungen'}`;
 
   return (
     <div className="screen">
@@ -73,7 +74,7 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
         <div className="section">
           <p className="label">Als Nächstes</p>
           <div className="big-num">{next.name}</div>
-          <p className="muted">{slotCounts.get(next.id)} Übungen</p>
+          <p className="muted">{exerciseCount(slotCounts.get(next.id))}</p>
           <button className="btn block" onClick={() => start(next.id)}>
             {next.name} starten
           </button>
@@ -88,7 +89,7 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
               <span className="cal-mark">{t.short}</span>
               <span className="grow">
                 {t.name}
-                <span className="muted small"> · {slotCounts.get(t.id)} Übungen</span>
+                <span className="muted small"> · {exerciseCount(slotCounts.get(t.id))}</span>
               </span>
             </button>
           ))}

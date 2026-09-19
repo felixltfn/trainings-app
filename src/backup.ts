@@ -8,7 +8,8 @@ interface Backup {
   tables: Record<string, unknown[]>;
 }
 
-async function collect(): Promise<Backup> {
+// Exported so the dev console can test an export/import round trip.
+export async function buildBackup(): Promise<Backup> {
   const tables: Record<string, unknown[]> = {};
   for (const name of TABLES) tables[name] = await db.table(name).toArray();
   return { format: 'trainings-app', version: 1, exportedAt: new Date().toISOString(), tables };
@@ -16,7 +17,7 @@ async function collect(): Promise<Backup> {
 
 // Share sheet on iOS, plain download on the desktop.
 export async function exportBackup(): Promise<string> {
-  const backup = await collect();
+  const backup = await buildBackup();
   const filename = `training-backup-${isoDate(new Date())}.json`;
   const file = new File([JSON.stringify(backup, null, 2)], filename, { type: 'application/json' });
 
