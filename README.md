@@ -117,7 +117,8 @@ Plan und Protokoll sind getrennt: Der Plan sagt, was du tun willst, das Protokol
 | `src/data.ts` | Datenbank-Abfragen (letzte Einheit, Training starten, Planversion kopieren) |
 | `src/stats.ts` | Auswertungen für Tagesansicht und Statistik |
 | `src/backup.ts` | Export und Import |
-| `src/screens/` | Die Bildschirme: Start, Training, Kalender, Statistik, Plan |
+| `src/stretchRun.ts` | Ablauf des Dehnens: Schritte bauen, Zeit nachrechnen, Zustand sichern |
+| `src/screens/` | Die Bildschirme: Start, Training, Kalender, Statistik, Plan, Dehnen |
 
 **Startseite:** zeigt den nächsten Trainingstag, die Wochen-Streak (wie viele Wochen in Folge du dreimal trainiert hast — eine Woche mit weniger als drei Trainings setzt sie zurück, die laufende Woche zählt erst ab dem dritten Training), die laufende Woche und das letzte Training.
 

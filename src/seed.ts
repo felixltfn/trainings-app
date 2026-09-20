@@ -1,4 +1,4 @@
-import { db, setMeta, type Exercise, type Slot, type SlotOverride } from './db';
+import { db, setMeta, type Exercise, type Slot, type SlotOverride, type Stretch } from './db';
 import { isoDate } from './logic';
 
 // Muscle groups used for "hard sets per muscle and week". New exercises pick from this list.
@@ -245,4 +245,111 @@ export async function applyPlanFixes(): Promise<void> {
 
     await db.meta.put({ key: 'planFixes1', value: Date.now() });
   });
+}
+
+// ---------- Stretching routine ----------
+// Same on all three training days. Editable in the settings, so this is only the start.
+const STRETCHES: Omit<Stretch, 'id' | 'position'>[] = [
+  {
+    name: 'Cossack Squat',
+    rounds: 2,
+    perSide: false,
+    seconds: null, // 6 Wiederholungen je Seite
+    restSeconds: 75,
+    note: 'Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. Langsam, Brust aufrecht. 6 Wiederholungen je Seite.',
+  },
+  {
+    name: 'Tiefe Hocke',
+    rounds: 1,
+    perSide: false,
+    seconds: 60,
+    restSeconds: null,
+    note: 'Fersen bleiben am Boden, Ellenbogen drücken die Knie nach außen.',
+  },
+  {
+    name: 'Vierfüßler auf Ellenbogen, Gesäß nach hinten',
+    rounds: 1,
+    perSide: false,
+    seconds: 60,
+    restSeconds: null,
+    note: 'Knie weit, Rücken neutral. Langsam vor und zurück schieben, nicht starr halten.',
+  },
+  {
+    name: 'Hüftbeuger im Ausfallschritt',
+    rounds: 2,
+    perSide: true,
+    seconds: 60,
+    restSeconds: null,
+    note: 'Hinteres Knie am Boden. Gesäß der hinteren Seite aktiv anspannen, Becken aufrichten.',
+  },
+  {
+    name: '90/90 aktiver Wechsel',
+    rounds: 1,
+    perSide: false,
+    seconds: null, // 10 Wechsel
+    restSeconds: null,
+    note: 'Ohne Hände von einer Seite auf die andere rollen. 10 Wechsel.',
+  },
+  {
+    name: '90/90 Halt mit Anspannung',
+    rounds: 2,
+    perSide: true,
+    seconds: 30,
+    restSeconds: null,
+    note: '10 s halten, 10 s Schienbein in den Boden drücken, lösen und tiefer gehen, 10 s halten. Rücken lang lassen.',
+  },
+  {
+    name: 'Seitliche Grätsche im Sitzen, erhöht',
+    rounds: 2,
+    perSide: false,
+    seconds: 45,
+    restSeconds: 25,
+    note: 'Auf 5–10 cm erhöht sitzen, Becken aufrichten. Zwischendurch 10 s die Beine aktiv in den Boden drücken.',
+  },
+  {
+    name: 'Liegende Wirbelsäulendrehung',
+    rounds: 2,
+    perSide: true,
+    seconds: 30,
+    restSeconds: null,
+    note: 'Locker bleiben, Schultern am Boden lassen.',
+  },
+  {
+    name: 'Kindshaltung',
+    rounds: 1,
+    perSide: false,
+    seconds: 30,
+    restSeconds: null,
+    note: 'Ruhig atmen.',
+  },
+  {
+    name: 'Oberschenkelvorderseite an der Wand',
+    rounds: 2,
+    perSide: true,
+    seconds: 45,
+    restSeconds: null,
+    note: 'Fuß an der Wand, Ziel sind die Schulterblätter an der Wand.',
+  },
+  {
+    name: 'Brustdehnung in der Ecke',
+    rounds: 1,
+    perSide: false,
+    seconds: 45,
+    restSeconds: null,
+    note: 'Arme angewinkelt, Oberkörper langsam nach vorn.',
+  },
+  {
+    name: 'Aushängen an der Stange',
+    rounds: 1,
+    perSide: false,
+    seconds: 45,
+    restSeconds: null,
+    note: 'Schultern locker, ruhig atmen.',
+  },
+];
+
+// Fills the stretching table on first start – also for databases that existed before.
+export async function seedStretchesIfEmpty(): Promise<void> {
+  if ((await db.stretches.count()) > 0) return;
+  await db.stretches.bulkAdd(STRETCHES.map((s, i) => ({ ...s, position: i + 1 })));
 }

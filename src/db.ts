@@ -90,12 +90,36 @@ export interface WorkoutSet {
   timestamp: number;
 }
 
+// ---------- Stretching ----------
+
+// One exercise of the stretching routine. Editable in the settings.
+export interface Stretch {
+  id: number;
+  position: number;
+  name: string;
+  rounds: number; // how often it is done in a row (sides count as rounds)
+  perSide: boolean; // true -> "Seite 1 von 2" instead of "Satz 1 von 2"
+  seconds: number | null; // null = no countdown, she taps "Fertig" (counted by reps)
+  restSeconds: number | null; // pause after each round; null = the standard 5 s
+  note: string;
+}
+
+export interface StretchSession {
+  id: number;
+  date: string; // YYYY-MM-DD
+  start: number; // epoch ms
+  end: number;
+  seconds: number; // how long the routine took
+}
+
 export interface Meta {
   key: string;
   value: unknown;
 }
 
 export const db = new Dexie('training') as Dexie & {
+  stretches: EntityTable<Stretch, 'id'>;
+  stretchSessions: EntityTable<StretchSession, 'id'>;
   exercises: EntityTable<Exercise, 'id'>;
   planVersions: EntityTable<PlanVersion, 'id'>;
   templates: EntityTable<Template, 'id'>;
@@ -115,7 +139,30 @@ db.version(1).stores({
   meta: 'key',
 });
 
-export const TABLES = ['exercises', 'planVersions', 'templates', 'slots', 'workouts', 'sets', 'meta'] as const;
+// Version 2 added the stretching routine
+db.version(2).stores({
+  exercises: '++id, name',
+  planVersions: '++id, start',
+  templates: '++id, planVersionId',
+  slots: '++id, templateId',
+  workouts: '++id, date, templateId, start',
+  sets: '++id, workoutId, exerciseId, [exerciseId+workoutId]',
+  meta: 'key',
+  stretches: '++id, position',
+  stretchSessions: '++id, date',
+});
+
+export const TABLES = [
+  'exercises',
+  'planVersions',
+  'templates',
+  'slots',
+  'workouts',
+  'sets',
+  'meta',
+  'stretches',
+  'stretchSessions',
+] as const;
 
 export async function getMeta<T>(key: string): Promise<T | undefined> {
   const row = await db.meta.get(key);

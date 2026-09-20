@@ -8,6 +8,7 @@ import { generateTestData, resetEverything } from '../devdata';
 import { isoDate } from '../logic';
 import { exportMarkdown } from '../obsidian';
 import { ExerciseEditor } from './ExerciseEditor';
+import { StretchEditor } from './StretchEditor';
 import { TemplateEditor } from './TemplateEditor';
 
 type View =
@@ -16,6 +17,7 @@ type View =
   | { kind: 'plan'; id: number }
   | { kind: 'template'; id: number; planId: number }
   | { kind: 'exercises' }
+  | { kind: 'stretches' }
   | { kind: 'exercise'; id: number | 'new' };
 
 export function SettingsScreen() {
@@ -32,7 +34,8 @@ export function SettingsScreen() {
     for (const p of plans) dayCounts.set(p.id, await db.templates.where('planVersionId').equals(p.id).count());
     const exercises = (await db.exercises.toArray()).sort((a, b) => a.name.localeCompare(b.name));
     const lastExport = await getMeta<number>('lastExport');
-    return { activeId, plans, dayCounts, exercises, lastExport };
+    const stretchCount = await db.stretches.count();
+    return { activeId, plans, dayCounts, exercises, lastExport, stretchCount };
   }, []);
 
   // The training days of the plan currently opened
@@ -43,13 +46,14 @@ export function SettingsScreen() {
   );
 
   if (!data) return <div className="screen" />;
-  const { activeId, plans, dayCounts, exercises, lastExport } = data;
+  const { activeId, plans, dayCounts, exercises, lastExport, stretchCount } = data;
   const activePlan = plans.find((p) => p.id === activeId);
 
   if (view.kind === 'template')
     return <TemplateEditor templateId={view.id} onClose={() => setView({ kind: 'plan', id: view.planId })} />;
   if (view.kind === 'exercise')
     return <ExerciseEditor exerciseId={view.id} onClose={() => setView({ kind: 'exercises' })} />;
+  if (view.kind === 'stretches') return <StretchEditor onClose={() => setView({ kind: 'root' })} />;
 
   const run = async (fn: () => Promise<string>) => {
     try {
@@ -272,6 +276,10 @@ export function SettingsScreen() {
           <button className="list-item chevron" onClick={() => setView({ kind: 'exercises' })}>
             <span className="grow">Übungen</span>
             <span className="muted">{exercises.length}</span>
+          </button>
+          <button className="list-item chevron" onClick={() => setView({ kind: 'stretches' })}>
+            <span className="grow">Dehnplan</span>
+            <span className="muted">{stretchCount}</span>
           </button>
         </div>
       </div>

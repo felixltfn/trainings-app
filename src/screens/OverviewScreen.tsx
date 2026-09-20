@@ -9,12 +9,13 @@ interface Props {
   onGoToWorkout: () => void;
   onOpenDay: (date: string) => void;
   onGoToSettings: () => void;
+  onStartStretch: () => void;
 }
 
 const DAY_MS = 86400000;
 const WORKOUTS_PER_WEEK = 3;
 
-export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Props) {
+export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings, onStartStretch }: Props) {
   const data = useLiveQuery(async () => {
     const planVersionId = await getActivePlanVersionId();
     const templates = planVersionId ? await db.templates.where('planVersionId').equals(planVersionId).sortBy('order') : [];
@@ -106,6 +107,13 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
           </div>
         )
       )}
+
+      <div className="section">
+        <p className="label">Dehnen</p>
+        <button className="btn secondary block" onClick={onStartStretch}>
+          Dehnablauf starten
+        </button>
+      </div>
 
       <div className="section">
         <p className="label">Wochen-Streak</p>

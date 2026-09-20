@@ -5,6 +5,7 @@ import { CalendarScreen } from './screens/CalendarScreen';
 import { OverviewScreen } from './screens/OverviewScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { StatsScreen } from './screens/StatsScreen';
+import { StretchScreen } from './screens/StretchScreen';
 import { TrainingTab } from './screens/TrainingTab';
 import { loadTimer, saveTimer, type TimerState } from './timer';
 
@@ -25,6 +26,8 @@ export function App() {
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
   // Short confirmation after finishing a workout
   const [justFinished, setJustFinished] = useState(false);
+  // 'after' = the page between workout and stretching, 'stretch' = the guided routine
+  const [flow, setFlow] = useState<'none' | 'after' | 'stretch'>('none');
 
   const setTimer = (t: TimerState | null) => {
     setTimerState(t);
@@ -36,13 +39,36 @@ export function App() {
     setTab('calendar');
   };
 
-  // After "Training beenden": confirmation, then back to the start screen
+  // After "Training speichern": confirmation, then the way into the stretching routine
   const handleFinished = () => {
     setTimer(null);
     setTab('start');
+    setFlow('after');
     setJustFinished(true);
     window.setTimeout(() => setJustFinished(false), 1800);
   };
+
+  if (flow === 'stretch') {
+    return <StretchScreen onClose={() => setFlow('none')} />;
+  }
+
+  if (flow === 'after') {
+    return (
+      <div className="screen">
+        <p className="label">Training gespeichert</p>
+        <h1 className="title">Jetzt dehnen?</h1>
+        <p className="muted">
+          Der Ablauf führt dich durch alle Übungen, mit Timer und Hinweisen. Du kannst jederzeit abbrechen.
+        </p>
+        <button className="btn block section" onClick={() => setFlow('stretch')}>
+          Dehnen starten
+        </button>
+        <button className="btn secondary block section-sm" onClick={() => setFlow('none')}>
+          Überspringen
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -51,6 +77,7 @@ export function App() {
           onGoToWorkout={() => setTab('training')}
           onOpenDay={showDay}
           onGoToSettings={() => setTab('settings')}
+          onStartStretch={() => setFlow('stretch')}
         />
       )}
       {tab === 'training' && <TrainingTab onSetDone={setTimer} onFinished={handleFinished} />}
