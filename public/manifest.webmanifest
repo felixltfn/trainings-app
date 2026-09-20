@@ -1,0 +1,17 @@
+{
+  "name": "Training",
+  "short_name": "Training",
+  "description": "Krafttraining protokollieren – lokal auf dem Gerät.",
+  "lang": "de",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "start_url": "./?v=2",
+  "scope": "./",
+  "id": "./?v=2",
+  "icons": [
+    { "src": "icon-192-v2.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512-v2.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -11,30 +11,21 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [
-        'apple-touch-icon-v2.png',
-        'apple-touch-icon-167-v2.png',
-        'apple-touch-icon-152-v2.png',
-        'apple-touch-icon-120-v2.png',
-      ],
-      manifest: {
-        name: 'Training',
-        short_name: 'Training',
-        description: 'Krafttraining protokollieren – lokal auf dem Gerät.',
-        lang: 'de',
-        // The query makes iOS treat this as a brand new web app, so it looks the
-        // icon up again instead of reusing the grey placeholder it remembered.
-        start_url: `${base}?v=2`,
-        id: `${base}?v=2`,
-        display: 'standalone',
-        orientation: 'portrait',
-        background_color: '#ffffff',
-        theme_color: '#ffffff',
-        icons: [
-          { src: 'icon-192-v2.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512-v2.png', sizes: '512x512', type: 'image/png' },
+      // Manifest and icons must never come from the offline cache: iOS reads them
+      // when the app is added to the home screen, and a stale copy breaks the icon.
+      workbox: {
+        globPatterns: ['**/*.{js,css,html}'],
+        globIgnores: ['**/manifest.webmanifest', '**/icon-*.png', '**/apple-touch-icon*.png'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }: { request: Request }) =>
+              request.destination === 'image' || request.destination === 'manifest',
+            handler: 'NetworkFirst',
+            options: { cacheName: 'assets', expiration: { maxEntries: 20 } },
+          },
         ],
       },
+      manifest: false,
     }),
   ],
 });
