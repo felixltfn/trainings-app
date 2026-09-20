@@ -23,6 +23,8 @@ export function App() {
   const [timer, setTimerState] = useState<TimerState | null>(loadTimer);
   // Day to open in the calendar, e.g. right after finishing a workout
   const [calendarDay, setCalendarDay] = useState<string | null>(null);
+  // Short confirmation after finishing a workout
+  const [justFinished, setJustFinished] = useState(false);
 
   const setTimer = (t: TimerState | null) => {
     setTimerState(t);
@@ -34,6 +36,14 @@ export function App() {
     setTab('calendar');
   };
 
+  // After "Training beenden": confirmation, then back to the start screen
+  const handleFinished = () => {
+    setTimer(null);
+    setTab('start');
+    setJustFinished(true);
+    window.setTimeout(() => setJustFinished(false), 1800);
+  };
+
   return (
     <>
       {tab === 'start' && (
@@ -43,12 +53,19 @@ export function App() {
           onGoToSettings={() => setTab('settings')}
         />
       )}
-      {tab === 'training' && <TrainingTab onSetDone={setTimer} onFinished={showDay} />}
+      {tab === 'training' && <TrainingTab onSetDone={setTimer} onFinished={handleFinished} />}
       {tab === 'calendar' && <CalendarScreen openDay={calendarDay} onOpenDay={setCalendarDay} />}
       {tab === 'stats' && <StatsScreen />}
       {tab === 'settings' && <SettingsScreen />}
 
       {timer && <RestTimer timer={timer} onChange={setTimer} />}
+
+      {justFinished && (
+        <div className="done-overlay" role="status">
+          <div className="done-badge">✓</div>
+          <p className="done-text">Training gespeichert</p>
+        </div>
+      )}
 
       <nav className="tabbar">
         {TABS.map((t) => (

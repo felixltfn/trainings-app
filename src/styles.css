@@ -6,8 +6,8 @@
   --text: #0a0a0a;
   --text-2: #6b6b70;
   --line: rgba(0, 0, 0, 0.1);
-  --accent: #ff4a00;
-  --accent-soft: rgba(255, 74, 0, 0.12);
+  --accent: #15633c;
+  --accent-soft: rgba(21, 99, 60, 0.12);
   --on-accent: #ffffff;
   --danger: #d70015;
   --gutter: 20px;
@@ -28,8 +28,10 @@
     --text: #f5f5f7;
     --text-2: #98989f;
     --line: rgba(255, 255, 255, 0.12);
-    --accent: #ff5f1f;
-    --accent-soft: rgba(255, 95, 31, 0.18);
+    --accent: #3da472;
+    --accent-soft: rgba(61, 164, 114, 0.18);
+    /* dark text on the lighter green reads better than white */
+    --on-accent: #05130c;
     --danger: #ff453a;
   }
 }
@@ -507,14 +509,6 @@ textarea.input {
   margin-top: 8px;
 }
 
-.set-extra {
-  margin-top: 4px;
-  margin-bottom: 10px;
-}
-
-.set-extra .num-input {
-  height: 44px;
-}
 
 .set-no {
   font-size: 15px;
@@ -800,4 +794,79 @@ button.banner {
 .streak-num {
   min-width: 64px;
   color: var(--accent);
+}
+
+.set-extra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px 42px;
+}
+
+.set-extra .toggle-btn {
+  padding: 0 14px;
+}
+
+/* Confirmation after finishing a workout */
+.done-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fade-out 1.8s ease forwards;
+  pointer-events: none;
+}
+
+.done-badge {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pop 0.45s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+.done-text {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .done-badge,
+  .done-overlay {
+    animation: none;
+  }
 }

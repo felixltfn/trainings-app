@@ -21,8 +21,10 @@ interface Props {
   saved: WorkoutSet | undefined;
   prefill: Prefill;
   showDetails: boolean;
+  extraRow: boolean; // a set added with "+ Satz" – its row can be removed completely
   onSave: (v: SetValues) => void;
-  onDelete: () => void;
+  onReset: () => void;
+  onRemoveRow: () => void;
 }
 
 const str = (n: number | null | undefined) => (n === null || n === undefined ? '' : fmtNum(n));
@@ -34,7 +36,7 @@ const asFields = (seconds: number | null) => {
   return { value: String(seconds), min: String(min), sec: String(sec) };
 };
 
-export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onSave, onDelete }: Props) {
+export function SetRow({ setNumber, side, type, saved, prefill, showDetails, extraRow, onSave, onReset, onRemoveRow }: Props) {
   const isTime = type === 'time';
   const savedValue = saved ? (isTime ? saved.duration : saved.reps) : null;
   const initial = asFields(saved ? savedValue : prefill.value);
@@ -147,9 +149,7 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onS
         </button>
       </div>
       {showDetails && (
-        <div className="set-row set-extra">
-          <span />
-          <span />
+        <div className="set-extra">
           <button
             className={`toggle-btn${drop ? ' on' : ''}`}
             aria-pressed={drop}
@@ -160,9 +160,14 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onS
           >
             Dropsatz
           </button>
-          <button className="toggle-btn" aria-label="Satz löschen" disabled={!saved} onClick={onDelete}>
-            ✕
+          <button className="toggle-btn" disabled={!saved} onClick={onReset}>
+            Zurücksetzen
           </button>
+          {extraRow && (
+            <button className="toggle-btn" onClick={onRemoveRow}>
+              Zeile entfernen
+            </button>
+          )}
         </div>
       )}
     </>

@@ -3,17 +3,7 @@ import { useState } from 'react';
 
 import { previousSession } from '../data';
 import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet } from '../db';
-import {
-  SIDE_LABEL,
-  WEIGHT_STEP,
-  fmtClock,
-  fmtNum,
-  fmtRest,
-  fmtTarget,
-  reachedTop,
-  sidesOf,
-  slotTargets,
-} from '../logic';
+import { SIDE_LABEL, WEIGHT_STEP, fmtClock, fmtNum, fmtRest, reachedTop, sidesOf, slotTargets } from '../logic';
 import { SetRow, type Prefill, type SetValues } from './SetRow';
 
 interface Props {
@@ -100,9 +90,17 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
     if (sides.every((s) => doneSides.has(s))) onSetDone(slot);
   };
 
-  const remove = async (setNumber: number, side: Side) => {
+  // Reset: the entry is deleted, the row stays and is prefilled again.
+  const reset = async (setNumber: number, side: Side) => {
     const existing = mine.find((s) => s.setNumber === setNumber && s.side === side);
-    if (existing && confirm(`Satz ${setNumber} ${SIDE_LABEL[side]} löschen?`)) await db.sets.delete(existing.id);
+    if (existing) await db.sets.delete(existing.id);
+  };
+
+  // Remove row: only for sets added with "+ Satz" – entry and row disappear.
+  const removeRow = async (setNumber: number) => {
+    await db.sets.bulkDelete(mine.filter((s) => s.setNumber === setNumber).map((s) => s.id));
+    const extra = Math.max(0, (workout.extraSets[extraKey] ?? 0) - 1);
+    await db.workouts.update(workout.id, { extraSets: { ...workout.extraSets, [extraKey]: extra } });
   };
 
   const choose = (id: number) => db.workouts.update(workout.id, { choices: { ...workout.choices, [slot.id]: id } });
@@ -154,12 +152,8 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
 
       <div className="slot-info">
         <span>
-          <b>{fmtTarget(targets, ex.type)}</b>
-        </span>
-        <span>
           Pause <b>{fmtRest(slot.restMin, slot.restMax)}</b>
         </span>
-        <span>{slot.orderFixed ? 'Reihenfolge fest geplant' : 'frei'}</span>
         {partner && <span>Supersatz mit {partner}</span>}
         {ex.unilateral && <span>einseitig</span>}
         {ex.bodyweight && <span>KG + Zusatzgewicht</span>}
@@ -203,8 +197,10 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
                 saved={mine.find((s) => s.setNumber === n && s.side === side)}
                 prefill={prefillFor(n, side)}
                 showDetails={showDetails}
+                extraRow={n > targets.sets}
                 onSave={(v) => save(n, side, v)}
-                onDelete={() => remove(n, side)}
+                onReset={() => reset(n, side)}
+                onRemoveRow={() => removeRow(n)}
               />
               <div className="last">{lastText(n, side)}</div>
             </div>
@@ -212,12 +208,19 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
         )}
       </div>
 
+      {showDetails && (
+        <p className="small muted">
+          Dropsatz: Satz, bei dem du sofort Gewicht reduzierst und weitermachst. Markierte Dropsätze zählen in der
+          Statistik nicht als eigener harter Satz. Zurücksetzen leert einen falsch eingetragenen Satz.
+        </p>
+      )}
+
       <div className="slot-actions">
         <button className="btn secondary grow" onClick={addSet}>
           + Satz
         </button>
         <button className={`btn secondary${showDetails ? ' on' : ''}`} onClick={() => setShowDetails(!showDetails)}>
-          {showDetails ? 'Fertig' : 'Dropsatz'}
+          {showDetails ? 'Fertig' : 'Satz bearbeiten'}
         </button>
       </div>
     </section>

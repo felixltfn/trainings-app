@@ -8,7 +8,7 @@ import { WorkoutScreen } from './WorkoutScreen';
 
 interface Props {
   onSetDone: (t: TimerState | null) => void;
-  onFinished: (date: string) => void;
+  onFinished: () => void;
 }
 
 export function TrainingTab({ onSetDone, onFinished }: Props) {
@@ -39,10 +39,7 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
         onSetDone={startTimer}
         onClose={(finishedDate) => {
           setShowList(true);
-          if (finishedDate) {
-            onSetDone(null);
-            onFinished(finishedDate);
-          }
+          if (finishedDate) onFinished();
         }}
       />
     );
