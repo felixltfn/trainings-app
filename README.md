@@ -91,13 +91,13 @@ Die Daten liegen nur auf dem iPhone. Ein iPhone-Backup über iCloud sichert sie 
 
 ### Exportieren
 
-1. Tab **Einstellungen** → **Backup exportieren (JSON)**.
+1. Tab **Plan** → **Backup exportieren (JSON)**.
 2. Auf dem iPhone öffnet sich das Teilen-Menü: Sichern in Dateien, per AirDrop auf den Mac, in iCloud Drive legen oder an dich selbst mailen.
 3. Am Mac lädt der Browser die Datei stattdessen direkt herunter (`training-backup-JJJJ-MM-TT.json`).
 
 ### Wiederherstellen
 
-1. Tab **Einstellungen** → **Backup importieren**.
+1. Tab **Plan** → **Backup importieren**.
 2. Die JSON-Datei auswählen.
 3. Sicherheitsabfrage bestätigen.
 
@@ -125,7 +125,7 @@ Plan und Protokoll sind getrennt: Der Plan sagt, was du tun willst, das Protokol
 
 **Tabellen:** `exercises` (Übungen — jede genau einmal), `planVersions` (Mesozyklen), `templates` (Trainingstage), `slots` (Positionen im Trainingstag mit Standardübung, Alternativen, Sätzen, Wiederholungsbereich, RIR, Pause), `workouts` (durchgeführte Einheiten), `sets` (einzelne Sätze), `meta` (Kleinkram wie das Datum des letzten Backups).
 
-**Neuer Mesozyklus:** Einstellungen → Planversionen → „+ Kopie". Das kopiert Trainingstage und Slots in eine neue Version, die du frei änderst. Alte Trainings zeigen weiter die Werte, mit denen du sie gemacht hast.
+**Neuer Mesozyklus:** Plan → Planversionen → „+ Kopie". Das kopiert Trainingstage und Slots in eine neue Version, die du frei änderst. Alte Trainings zeigen weiter die Werte, mit denen du sie gemacht hast.
 
 ---
 
