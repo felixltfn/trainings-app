@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { startWorkout, suggestNextTemplateId } from '../data';
 import { db, getActivePlanVersionId, getMeta } from '../db';
 import { addDays, fmtDuration, fmtNum, isoDate, parseIsoDate, trainingTime, weekStart } from '../logic';
-import { summarizeWorkout } from '../stats';
+import { summarizeWorkout, weeklyStreak } from '../stats';
 
 interface Props {
   onGoToWorkout: () => void;
@@ -42,6 +42,8 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
   const thisWeek = workouts.filter((w) => w.end !== null && w.date >= from && w.date <= to);
   const weekTime = thisWeek.reduce((sum, w) => sum + (trainingTime(w, sets) ?? 0), 0);
   const weekSets = thisWeek.reduce((sum, w) => sum + summarizeWorkout(w, sets, workouts, exercises).hardSetTotal, 0);
+
+  const streak = weeklyStreak(workouts, WORKOUTS_PER_WEEK);
 
   const exportDue = workouts.length > 0 && (!lastExport || Date.now() - lastExport > 14 * DAY_MS);
 
@@ -90,6 +92,21 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
           </div>
         )
       )}
+
+      <div className="section">
+        <p className="label">Wochen-Streak</p>
+        <div className="row">
+          <div className="big-num streak-num">{streak.current}</div>
+          <div className="grow small">
+            {streak.current === 0
+              ? `Noch ${streak.missing} ${streak.missing === 1 ? 'Training' : 'Trainings'} diese Woche, dann startet die Streak.`
+              : streak.missing > 0
+                ? `${streak.current === 1 ? 'Woche' : 'Wochen'} in Folge mit ${WORKOUTS_PER_WEEK} Trainings. Diese Woche fehlen noch ${streak.missing}.`
+                : `${streak.current === 1 ? 'Woche' : 'Wochen'} in Folge mit ${WORKOUTS_PER_WEEK} Trainings. Diese Woche ist geschafft.`}
+            {streak.best > streak.current && <span className="muted"> Rekord: {streak.best} Wochen.</span>}
+          </div>
+        </div>
+      </div>
 
       <div className="section">
         <p className="label">Diese Woche</p>

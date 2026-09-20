@@ -785,3 +785,8 @@ button.banner {
   text-align: left;
   color: inherit;
 }
+
+.streak-num {
+  min-width: 64px;
+  color: var(--accent);
+}

@@ -117,7 +117,11 @@ Plan und Protokoll sind getrennt: Der Plan sagt, was du tun willst, das Protokol
 | `src/data.ts` | Datenbank-Abfragen (letzte Einheit, Training starten, Planversion kopieren) |
 | `src/stats.ts` | Auswertungen für Tagesansicht und Statistik |
 | `src/backup.ts` | Export und Import |
-| `src/screens/` | Die Bildschirme: Training, Kalender, Statistik, Einstellungen |
+| `src/screens/` | Die Bildschirme: Start, Training, Kalender, Statistik, Plan |
+
+**Startseite:** zeigt den nächsten Trainingstag, die Wochen-Streak (wie viele Wochen in Folge du dreimal trainiert hast — eine Woche mit weniger als drei Trainings setzt sie zurück, die laufende Woche zählt erst ab dem dritten Training), die laufende Woche und das letzte Training.
+
+**Trainingszeit:** wird vom ersten bis zum letzten eingetragenen Satz gemessen, nicht vom Öffnen der App. Aufwärmen vor dem ersten Satz zählt also nicht mit.
 
 **Tabellen:** `exercises` (Übungen — jede genau einmal), `planVersions` (Mesozyklen), `templates` (Trainingstage), `slots` (Positionen im Trainingstag mit Standardübung, Alternativen, Sätzen, Wiederholungsbereich, RIR, Pause), `workouts` (durchgeführte Einheiten), `sets` (einzelne Sätze), `meta` (Kleinkram wie das Datum des letzten Backups).
 

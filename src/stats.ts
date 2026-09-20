@@ -1,6 +1,16 @@
 import type { Exercise, Slot, Workout, WorkoutSet } from './db';
 import { bodyweightFor } from './data';
-import { epley, fmtClock, hardSetsPerMuscle, setLoad, setVolume, slotTargets } from './logic';
+import {
+  addDays,
+  epley,
+  fmtClock,
+  hardSetsPerMuscle,
+  parseIsoDate,
+  setLoad,
+  setVolume,
+  slotTargets,
+  weekStart,
+} from './logic';
 
 export interface WorkoutSummary {
   volume: number;
@@ -150,3 +160,44 @@ export function weekHardSets(
 }
 
 
+
+// ---------- Weekly streak ----------
+
+export interface Streak {
+  current: number; // weeks in a row with enough workouts
+  best: number;
+  thisWeek: number; // workouts done in the running week
+  missing: number; // workouts still needed this week
+}
+
+// A week (Monday–Sunday) counts when at least `goal` workouts were finished in it.
+// The running week never breaks the streak – it just doesn't count yet.
+export function weeklyStreak(workouts: Workout[], goal = 3, today = new Date()): Streak {
+  const perWeek = new Map<string, number>();
+  for (const w of workouts) {
+    if (w.end === null) continue;
+    const week = weekStart(parseIsoDate(w.date));
+    perWeek.set(week, (perWeek.get(week) ?? 0) + 1);
+  }
+
+  const thisWeekStart = weekStart(today);
+  const thisWeek = perWeek.get(thisWeekStart) ?? 0;
+
+  let current = thisWeek >= goal ? 1 : 0;
+  for (let week = addDays(thisWeekStart, -7); (perWeek.get(week) ?? 0) >= goal; week = addDays(week, -7)) {
+    current++;
+  }
+
+  // Longest streak ever, for the record line
+  let best = 0;
+  let run = 0;
+  const weeks = [...perWeek.keys()].sort();
+  for (const [i, week] of weeks.entries()) {
+    const previous = weeks[i - 1];
+    const isNext = previous !== undefined && addDays(previous, 7) === week;
+    run = (perWeek.get(week) ?? 0) >= goal ? (isNext ? run + 1 : 1) : 0;
+    best = Math.max(best, run);
+  }
+
+  return { current, best: Math.max(best, current), thisWeek, missing: Math.max(0, goal - thisWeek) };
+}
