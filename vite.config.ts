@@ -22,6 +22,10 @@ export default defineConfig({
         short_name: 'Training',
         description: 'Krafttraining protokollieren – lokal auf dem Gerät.',
         lang: 'de',
+        // The query makes iOS treat this as a brand new web app, so it looks the
+        // icon up again instead of reusing the grey placeholder it remembered.
+        start_url: `${base}?v=2`,
+        id: `${base}?v=2`,
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#ffffff',
