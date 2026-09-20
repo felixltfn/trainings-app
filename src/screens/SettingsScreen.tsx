@@ -21,6 +21,7 @@ export function SettingsScreen() {
   const [view, setView] = useState<View>({ kind: 'root' });
   const [message, setMessage] = useState('');
   const [newName, setNewName] = useState(''); // inline name field for a new plan or training day
+  const [planName, setPlanName] = useState<string | null>(null); // draft while renaming a plan
   const fileInput = useRef<HTMLInputElement>(null);
 
   const data = useLiveQuery(async () => {
@@ -68,12 +69,11 @@ export function SettingsScreen() {
     const name = newName.trim();
     if (!name) return;
     setNewName('');
-    const id = await db.templates.add({
-      planVersionId: planId,
-      name,
-      short: name.slice(0, 1).toUpperCase(),
-      order: days?.length ?? 0,
-    });
+    // First free letter of the name, so two days never share a short label
+    const taken = new Set((days ?? []).map((t) => t.short.toUpperCase()));
+    const candidates = [...name.toUpperCase().replace(/[^A-Z0-9]/g, ''), ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+    const short = candidates.find((c) => !taken.has(c)) ?? '•';
+    const id = await db.templates.add({ planVersionId: planId, name, short, order: days?.length ?? 0 });
     setView({ kind: 'template', id, planId });
   };
 
@@ -103,10 +103,28 @@ export function SettingsScreen() {
           <span>Name des Plans</span>
           <input
             className="input"
-            defaultValue={plan.name}
-            onBlur={(e) => e.target.value.trim() && db.planVersions.update(plan.id, { name: e.target.value.trim() })}
+            value={planName ?? plan.name}
+            onChange={(e) => setPlanName(e.target.value)}
           />
         </label>
+        {planName !== null && planName.trim() !== plan.name && (
+          <div className="row section-sm">
+            <button
+              className="btn grow"
+              disabled={!planName.trim()}
+              onClick={async () => {
+                await db.planVersions.update(plan.id, { name: planName.trim() });
+                setPlanName(null);
+                setMessage('Name gespeichert.');
+              }}
+            >
+              Speichern
+            </button>
+            <button className="btn secondary grow" onClick={() => setPlanName(null)}>
+              Verwerfen
+            </button>
+          </div>
+        )}
 
         {plan.id === activeId ? (
           <p className="banner section-sm">Dieser Plan ist aktiv – seine Tage erscheinen unter „Training“.</p>

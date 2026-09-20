@@ -28,8 +28,14 @@ export function SlotEditor({ slotId, onClose }: Props) {
     onClose();
   };
 
+  const discard = () => {
+    if (draft && !confirm('Änderungen an dieser Übung verwerfen?')) return;
+    setDraft(null);
+    onClose();
+  };
+
   const remove = async () => {
-    if (!confirm('Diesen Slot löschen? Bereits eingetragene Sätze bleiben erhalten.')) return;
+    if (!confirm('Diese Übung aus dem Plan löschen? Bereits eingetragene Sätze bleiben erhalten.')) return;
     await db.slots.delete(slotId);
     onClose();
   };
@@ -54,13 +60,13 @@ export function SlotEditor({ slotId, onClose }: Props) {
   return (
     <div className="sheet">
       <div className="screen">
-        <button className="back" onClick={onClose}>
+        <button className="back" onClick={discard}>
           ‹ Zurück
         </button>
-        <h1 className="title">Slot</h1>
+        <h1 className="title">Übung im Plan</h1>
 
         <label className="field">
-          <span>Slot-Name (z. B. „Brust schräg“)</span>
+          <span>Bezeichnung (z. B. „Brust schräg“)</span>
           <input className="input" value={value.name} onChange={(e) => patch({ name: e.target.value })} />
         </label>
 
@@ -169,8 +175,11 @@ export function SlotEditor({ slotId, onClose }: Props) {
           <button className="btn block" onClick={save}>
             Speichern
           </button>
+          <button className="btn secondary block" onClick={discard}>
+            Verwerfen
+          </button>
           <button className="btn danger block" onClick={remove}>
-            Slot löschen
+            Aus dem Plan löschen
           </button>
         </div>
       </div>
