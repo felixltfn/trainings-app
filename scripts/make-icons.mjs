@@ -1,4 +1,5 @@
 // Generates the PNG app icons without extra dependencies: a plain accent square with a white dumbbell.
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
@@ -56,11 +57,22 @@ function png(size) {
   ]);
 }
 
-writeFileSync('public/icon-192.png', png(192));
-writeFileSync('public/icon-512.png', png(512));
+// The hand-written PNG above is minimal (no colour profile). iOS renders it in
+// Safari but refuses it as a home screen icon, so macOS re-encodes it properly.
+function write(path, size) {
+  writeFileSync(path, png(size));
+  try {
+    execFileSync('sips', ['-m', '/System/Library/ColorSync/Profiles/sRGB Profile.icc', path], { stdio: 'ignore' });
+  } catch {
+    console.warn(`sips not available – ${path} stays as written`);
+  }
+}
+
+write('public/icon-192-v2.png', 192);
+write('public/icon-512-v2.png', 512);
 // iOS picks the icon when the page is added to the home screen – offer every common size
-writeFileSync('public/apple-touch-icon.png', png(180));
-writeFileSync('public/apple-touch-icon-167.png', png(167));
-writeFileSync('public/apple-touch-icon-152.png', png(152));
-writeFileSync('public/apple-touch-icon-120.png', png(120));
+write('public/apple-touch-icon-v2.png', 180);
+write('public/apple-touch-icon-167-v2.png', 167);
+write('public/apple-touch-icon-152-v2.png', 152);
+write('public/apple-touch-icon-120-v2.png', 120);
 console.log('Icons written to public/');
