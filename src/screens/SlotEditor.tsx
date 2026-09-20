@@ -135,7 +135,7 @@ export function SlotEditor({ slotId, onClose }: Props) {
             />
           </label>
           <label className="field">
-            <span>RIR (Text)</span>
+            <span>RIR (nur Plannotiz)</span>
             <input className="input" value={value.rir} onChange={(e) => patch({ rir: e.target.value })} />
           </label>
         </div>

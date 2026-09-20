@@ -11,6 +11,8 @@ const shortDate = (iso: string) => parseIsoDate(iso).toLocaleDateString('de-DE',
 // Recharts hands over loosely typed values, so the formatters take unknown and narrow themselves.
 const tooltipDate = (label: unknown) => (typeof label === 'string' ? shortDate(label) : '');
 const tooltipNum = (decimals: number) => (v: unknown) => (typeof v === 'number' ? fmtNum(v, decimals) : '');
+// Four-digit volumes would be cut off on the axis, so they are shown as "2,4k".
+const compact = (v: number) => (Math.abs(v) >= 1000 ? `${fmtNum(v / 1000, 1)}k` : fmtNum(v));
 
 export function StatsScreen() {
   const [exerciseId, setExerciseId] = useState<number | null>(null);
@@ -37,6 +39,12 @@ export function StatsScreen() {
 
   const series = current ? exerciseSeries(current, sets, workouts) : [];
   const records = current ? personalRecords(current, series, sets, workouts) : null;
+
+  // Bodyweight over time: one point per workout where a weight was entered
+  const bodyweightSeries = workouts
+    .filter((w) => w.bodyweight !== null)
+    .sort((a, b) => a.start - b.start)
+    .map((w) => ({ date: w.date, bodyweight: w.bodyweight }));
 
   const weekEnd = addDays(week, 6);
   const done = weekHardSets(week, weekEnd, workouts, sets, exercises);
@@ -92,6 +100,26 @@ export function StatsScreen() {
         </div>
       </div>
 
+      {bodyweightSeries.length > 0 && (
+        <div className="section">
+          <p className="label">Körpergewicht (kg)</p>
+          <div className="chart">
+            <ResponsiveContainer>
+              <LineChart data={bodyweightSeries} margin={{ top: 8, right: 8, bottom: 0, left: -6 }}>
+                <CartesianGrid stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={shortDate} tick={axis} tickLine={false} axisLine={false} />
+                <YAxis tick={axis} tickLine={false} axisLine={false} width={46} domain={['dataMin - 2', 'dataMax + 2']} />
+                <Tooltip labelFormatter={tooltipDate} formatter={tooltipNum(1)} />
+                <Line type="monotone" dataKey="bodyweight" name="Körpergewicht" stroke="var(--accent)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="small muted">
+            Aus dem Feld „Körpergewicht“ im Training. {fmtNum(bodyweightSeries[bodyweightSeries.length - 1]?.bodyweight ?? 0, 1)} kg zuletzt.
+          </p>
+        </div>
+      )}
+
       <div className="section">
         <p className="label">Übung</p>
         {trained.length === 0 ? (
@@ -117,7 +145,7 @@ export function StatsScreen() {
             <p className="label">{current.type === 'time' ? 'Dauer (s)' : 'Geschätztes 1RM (kg, Epley)'}</p>
             <div className="chart">
               <ResponsiveContainer>
-                <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+                <LineChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -6 }}>
                   <CartesianGrid stroke="var(--line)" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axis} tickLine={false} axisLine={false} />
                   <YAxis tick={axis} tickLine={false} axisLine={false} width={46} />
@@ -147,10 +175,10 @@ export function StatsScreen() {
             <p className="label">Volumen pro Einheit (kg)</p>
             <div className="chart">
               <ResponsiveContainer>
-                <BarChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+                <BarChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: -6 }}>
                   <CartesianGrid stroke="var(--line)" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axis} tickLine={false} axisLine={false} />
-                  <YAxis tick={axis} tickLine={false} axisLine={false} width={46} />
+                  <YAxis tick={axis} tickLine={false} axisLine={false} width={46} tickFormatter={compact} />
                   <Tooltip labelFormatter={tooltipDate} formatter={tooltipNum(0)} />
                   <Bar dataKey="volume" name="Volumen" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                 </BarChart>

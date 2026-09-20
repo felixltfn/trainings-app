@@ -14,6 +14,7 @@
   --tap: 52px;
   --radius: 12px;
   --tabbar: 58px;
+  --font: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light dark;
@@ -45,7 +46,7 @@ svg text {
 }
 
 html {
-  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font);
 }
 
 html,
@@ -53,7 +54,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font);
   font-size: 17px;
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
@@ -64,9 +65,19 @@ body {
 button,
 input,
 select,
-textarea {
-  font: inherit;
+textarea,
+option,
+optgroup {
+  font-family: var(--font);
   color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 button {

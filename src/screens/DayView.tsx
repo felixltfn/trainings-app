@@ -189,7 +189,7 @@ function ExerciseBlock({ exercise, sets, bodyweight }: { exercise: Exercise | un
   const text = (s: WorkoutSet) => {
     const load = exercise.bodyweight ? `${fmtNum((bodyweight ?? 0) + s.weight)} kg (KG)` : `${fmtNum(s.weight)} kg`;
     const value = exercise.type === 'time' ? `${fmtClock(s.duration ?? 0)} min` : `${s.reps} Wdh`;
-    return `${load} × ${value}${s.drop ? ' · Drop' : ''}${s.rir !== null ? ` · RIR ${s.rir}` : ''}`;
+    return `${load} × ${value}${s.drop ? ' · Drop' : ''}`;
   };
   return (
     <div className="section-sm">

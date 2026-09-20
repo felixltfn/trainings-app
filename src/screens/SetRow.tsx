@@ -6,7 +6,6 @@ import { SIDE_LABEL, fmtNum, parseNum, splitTime } from '../logic';
 export interface SetValues {
   weight: number;
   value: number; // reps, or seconds for type 'time'
-  rir: number | null;
   drop: boolean;
 }
 
@@ -44,7 +43,6 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onS
   const [value, setValue] = useState(initial.value);
   const [min, setMin] = useState(initial.min);
   const [sec, setSec] = useState(initial.sec);
-  const [rir, setRir] = useState(str(saved?.rir));
   const [drop, setDrop] = useState(saved?.drop ?? false);
   const [touched, setTouched] = useState(false);
 
@@ -67,21 +65,17 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onS
     setValue(f.value);
     setMin(f.min);
     setSec(f.sec);
-    setRir(str(saved.rir));
     setDrop(saved.drop);
     setTouched(false);
   }, [savedKey, saved, isTime]);
 
   const parsedWeight = parseNum(weight) ?? 0;
   const parsedValue = isTime ? (parseNum(min) ?? 0) * 60 + (parseNum(sec) ?? 0) : parseNum(value);
-  const parsedRir = parseNum(rir);
-  const dirty =
-    !!saved &&
-    (parsedWeight !== saved.weight || parsedValue !== savedValue || parsedRir !== saved.rir || drop !== saved.drop);
+  const dirty = !!saved && (parsedWeight !== saved.weight || parsedValue !== savedValue || drop !== saved.drop);
 
   const submit = () => {
     if (parsedValue === null || parsedValue <= 0) return;
-    onSave({ weight: parsedWeight, value: parsedValue, rir: parsedRir, drop });
+    onSave({ weight: parsedWeight, value: parsedValue, drop });
   };
 
   const edit = (setter: (s: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,14 +149,7 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, onS
       {showDetails && (
         <div className="set-row set-extra">
           <span />
-          <input
-            className="num-input small-font"
-            inputMode="decimal"
-            placeholder="RIR"
-            aria-label="RIR"
-            value={rir}
-            onChange={edit(setRir)}
-          />
+          <span />
           <button
             className={`toggle-btn${drop ? ' on' : ''}`}
             aria-pressed={drop}

@@ -78,7 +78,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       weight: v.weight,
       reps: ex.type === 'time' ? null : v.value,
       duration: ex.type === 'time' ? v.value : null,
-      rir: v.rir,
+      rir: existing?.rir ?? null, // RIR is no longer entered; old values stay untouched
       drop: v.drop,
     };
     if (existing) {
@@ -157,9 +157,6 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
           <b>{fmtTarget(targets, ex.type)}</b>
         </span>
         <span>
-          RIR <b>{targets.rir}</b>
-        </span>
-        <span>
           Pause <b>{fmtRest(slot.restMin, slot.restMax)}</b>
         </span>
         <span>{slot.orderFixed ? 'Reihenfolge fest geplant' : 'frei'}</span>
@@ -192,7 +189,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
               <span>Sek</span>
             </>
           ) : (
-            <span>Wdh</span>
+            <span />
           )}
           <span />
         </div>
@@ -220,7 +217,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
           + Satz
         </button>
         <button className={`btn secondary${showDetails ? ' on' : ''}`} onClick={() => setShowDetails(!showDetails)}>
-          {showDetails ? 'Fertig' : 'RIR · Drop'}
+          {showDetails ? 'Fertig' : 'Dropsatz'}
         </button>
       </div>
     </section>

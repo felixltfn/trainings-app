@@ -58,11 +58,12 @@ export function fmtRest(min: number, max: number): string {
   return `${one(min)}–${one(max)}`;
 }
 
+// Reps are shown as a bare range ("5–10"), time keeps its unit ("bis 180 s").
 export function fmtTarget(t: Targets, type: Exercise['type']): string {
-  const unit = type === 'time' ? 's' : 'Wdh';
-  if (t.repMin === 0) return `bis ${t.repMax} ${unit}`;
-  if (t.repMin === t.repMax) return `${t.repMax} ${unit}`;
-  return `${t.repMin}–${t.repMax} ${unit}`;
+  const unit = type === 'time' ? ' s' : '';
+  if (t.repMin === 0) return `bis ${t.repMax}${unit}`;
+  if (t.repMin === t.repMax) return `${t.repMax}${unit}`;
+  return `${t.repMin}–${t.repMax}${unit}`;
 }
 
 // ---------- Slot targets (with per-exercise overrides) ----------
