@@ -250,12 +250,13 @@ export async function applyPlanFixes(): Promise<void> {
 // ---------- Stretching routine ----------
 // Same on all three training days. Editable in the settings, so this is only the start.
 const STRETCHES: Omit<Stretch, 'id' | 'position'>[] = [
+  // The deep squat fills the pause between the two cossack squat sets
   {
     name: 'Cossack Squat',
-    rounds: 2,
+    rounds: 1,
     perSide: false,
     seconds: null, // 6 Wiederholungen je Seite
-    restSeconds: 75,
+    restSeconds: null,
     note: 'Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. Langsam, Brust aufrecht. 6 Wiederholungen je Seite.',
   },
   {
@@ -265,6 +266,14 @@ const STRETCHES: Omit<Stretch, 'id' | 'position'>[] = [
     seconds: 60,
     restSeconds: null,
     note: 'Fersen bleiben am Boden, Ellenbogen drücken die Knie nach außen.',
+  },
+  {
+    name: 'Cossack Squat',
+    rounds: 1,
+    perSide: false,
+    seconds: null,
+    restSeconds: null,
+    note: 'Zweiter Durchgang. Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. 6 Wiederholungen je Seite.',
   },
   {
     name: 'Vierfüßler auf Ellenbogen, Gesäß nach hinten',
@@ -352,4 +361,35 @@ const STRETCHES: Omit<Stretch, 'id' | 'position'>[] = [
 export async function seedStretchesIfEmpty(): Promise<void> {
   if ((await db.stretches.count()) > 0) return;
   await db.stretches.bulkAdd(STRETCHES.map((s, i) => ({ ...s, position: i + 1 })));
+}
+
+// One-off correction for stretching plans created before this change: the deep squat
+// now sits between the two cossack squat sets instead of a 75 second pause.
+export async function applyStretchFixes(): Promise<void> {
+  if (await db.meta.get('stretchFix1')) return;
+
+  await db.transaction('rw', [db.stretches, db.meta], async () => {
+    const plan = await db.stretches.orderBy('position').toArray();
+    const cossack = plan[0];
+    const squat = plan[1];
+    const untouched =
+      cossack?.name === 'Cossack Squat' && cossack.rounds === 2 && squat?.name === 'Tiefe Hocke';
+
+    if (untouched) {
+      await db.stretches.update(cossack.id, { rounds: 1, restSeconds: null });
+      // Everything after the deep squat moves one position down
+      for (const s of plan.slice(2)) await db.stretches.update(s.id, { position: s.position + 1 });
+      await db.stretches.add({
+        position: squat.position + 1,
+        name: 'Cossack Squat',
+        rounds: 1,
+        perSide: false,
+        seconds: null,
+        restSeconds: null,
+        note: 'Zweiter Durchgang. Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. 6 Wiederholungen je Seite.',
+      });
+    }
+
+    await db.meta.put({ key: 'stretchFix1', value: Date.now() });
+  });
 }
