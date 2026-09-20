@@ -63,7 +63,6 @@ const EXERCISES: SeedExercise[] = [
   ex('Bulgarische Split Squats', 'Quadrizeps', ['Gesäß', 'Adduktoren'], { unilateral: true }),
   ex('Rumänisches Kreuzheben', 'Beinbeuger', ['Gesäß', 'Unterer Rücken']),
   ex('Kreuzheben', 'Gesäß', ['Beinbeuger', 'Unterer Rücken', 'Quadrizeps']),
-  ex('Beinbeuger sitzend', 'Beinbeuger', []),
   ex('Beinbeuger liegend', 'Beinbeuger', []),
   ex('Beinstrecker', 'Quadrizeps', []),
   ex('Wadenheben stehend', 'Waden', []),
@@ -121,7 +120,7 @@ const TEMPLATES: { name: string; short: string; slots: SeedSlot[] }[] = [
     slots: [
       { name: 'Kniebeuge', ex: 'Kniebeugen', alt: ['Beinpresse', 'Bulgarische Split Squats'], sets: 3, reps: [5, 8], rir: '1–3', rest: [180, 180], fixed: true, over: { 'Bulgarische Split Squats': { repMin: 8, repMax: 12 } } },
       { name: 'Hüftstreckung', ex: 'Rumänisches Kreuzheben', alt: ['Kreuzheben'], sets: 3, reps: [6, 10], rir: '2–3', rest: [180, 180], fixed: true },
-      { name: 'Beinbeuger', ex: 'Beinbeuger sitzend', alt: ['Beinbeuger liegend'], sets: 3, reps: [8, 12], rir: '0–1', rest: [90, 120], ss: '1' },
+      { name: 'Beinbeuger', ex: 'Beinbeuger liegend', sets: 3, reps: [8, 12], rir: '0–1', rest: [90, 120], ss: '1' },
       { name: 'Beinstrecker', ex: 'Beinstrecker', sets: 3, reps: [10, 15], rir: '0–1', rest: [90, 120], ss: '1' },
       { name: 'Waden', ex: 'Wadenheben stehend', alt: ['Wadenheben an der Beinpresse'], sets: 4, reps: [8, 15], rir: '0–1', rest: [90, 90], ss: '2' },
       { name: 'Adduktoren', ex: 'Adduktoren-Maschine', sets: 3, reps: [10, 15], rir: '0–1', rest: [90, 120], ss: '3' },

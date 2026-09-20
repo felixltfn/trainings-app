@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { bodyweightFor, deleteWorkout } from '../data';
 import { db, type Exercise, type Workout, type WorkoutSet } from '../db';
-import { SIDE_LABEL, fmtDuration, fmtNum, parseIsoDate, workoutDuration } from '../logic';
+import { SIDE_LABEL, fmtClock, fmtDuration, fmtNum, parseIsoDate, trainingTime } from '../logic';
 import { summarizeWorkout } from '../stats';
 import { WorkoutScreen } from './WorkoutScreen';
 
@@ -61,17 +61,19 @@ export function DayView({ date, onClose }: Props) {
             .sort((a, b) => b.start - a.start)[0];
           const prevSummary = prev ? summarizeWorkout(prev, sets, workouts, exercises) : null;
           const mine = sets.filter((s) => s.workoutId === w.id);
-          const duration = workoutDuration(w);
+          // Training time: from the first to the last logged set
+          const duration = trainingTime(w, sets);
+          const prevDuration = prev ? trainingTime(prev, sets) : null;
 
           return (
             <div key={w.id} className="section">
               <p className="label">{template?.name ?? 'Training'}</p>
               <div className="stats-row">
                 <Stat
-                  label="Dauer"
+                  label="Trainingszeit"
                   value={duration ? String(Math.round(duration / 60000)) : '–'}
                   unit="min"
-                  delta={duration && prev?.end ? duration - workoutDuration(prev)! : null}
+                  delta={duration && prevDuration ? duration - prevDuration : null}
                   fmt={(d) => fmtDuration(Math.abs(d))}
                 />
                 <Stat
@@ -89,6 +91,9 @@ export function DayView({ date, onClose }: Props) {
                   fmt={(d) => fmtNum(Math.abs(d))}
                 />
               </div>
+              <p className="small muted">
+                {firstLastText(sets, w)}
+              </p>
               {prev && (
                 <p className="small muted">
                   Vergleich mit {parseIsoDate(prev.date).toLocaleDateString('de-DE')} ({template?.name})
@@ -155,6 +160,14 @@ export function DayView({ date, onClose }: Props) {
   );
 }
 
+// "Erster Satz 18:12 · letzter Satz 19:27"
+function firstLastText(sets: WorkoutSet[], w: Workout): string {
+  const stamps = sets.filter((s) => s.workoutId === w.id).map((s) => s.timestamp);
+  if (stamps.length === 0) return 'Keine Sätze eingetragen.';
+  const time = (t: number) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `Erster Satz ${time(Math.min(...stamps))} · letzter Satz ${time(Math.max(...stamps))}`;
+}
+
 function Stat({ label, value, unit, delta, fmt }: { label: string; value: string; unit: string; delta: number | null; fmt: (d: number) => string }) {
   return (
     <div className="stat">
@@ -175,7 +188,7 @@ function ExerciseBlock({ exercise, sets, bodyweight }: { exercise: Exercise | un
   if (!exercise) return null;
   const text = (s: WorkoutSet) => {
     const load = exercise.bodyweight ? `${fmtNum((bodyweight ?? 0) + s.weight)} kg (KG)` : `${fmtNum(s.weight)} kg`;
-    const value = exercise.type === 'time' ? `${s.duration} s` : `${s.reps} Wdh`;
+    const value = exercise.type === 'time' ? `${fmtClock(s.duration ?? 0)} min` : `${s.reps} Wdh`;
     return `${load} × ${value}${s.drop ? ' · Drop' : ''}${s.rir !== null ? ` · RIR ${s.rir}` : ''}`;
   };
   return (

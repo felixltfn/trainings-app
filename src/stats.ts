@@ -1,6 +1,6 @@
 import type { Exercise, Slot, Workout, WorkoutSet } from './db';
 import { bodyweightFor } from './data';
-import { epley, hardSetsPerMuscle, setLoad, setVolume, slotTargets } from './logic';
+import { epley, fmtClock, hardSetsPerMuscle, setLoad, setVolume, slotTargets } from './logic';
 
 export interface WorkoutSummary {
   volume: number;
@@ -44,7 +44,7 @@ export function summarizeWorkout(
     if (today > best && best > 0) {
       records.push({
         exercise: ex.name,
-        text: ex.type === 'time' ? `${Math.round(today)} s` : `1RM ${today.toFixed(1)} kg`,
+        text: ex.type === 'time' ? `${fmtClock(Math.round(today))} min` : `1RM ${today.toFixed(1)} kg`,
       });
     }
   }

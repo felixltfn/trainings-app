@@ -36,6 +36,16 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  /* Sans-serif everywhere: no element may fall back to the browser's serif default */
+  font-family: inherit;
+}
+
+svg text {
+  font-family: inherit;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 html,
@@ -43,7 +53,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   font-size: 17px;
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
@@ -533,6 +543,11 @@ textarea.input {
   font-size: 18px;
 }
 
+.set-row.time,
+.set-head.time {
+  grid-template-columns: 34px 1fr 0.8fr 0.8fr 56px;
+}
+
 .set-head {
   display: grid;
   grid-template-columns: 34px 1fr 1fr 56px;
@@ -758,4 +773,15 @@ textarea.input {
 
 .flush {
   margin: 0;
+}
+
+.stats-row.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+button.banner {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  color: inherit;
 }

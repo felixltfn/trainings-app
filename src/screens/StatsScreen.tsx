@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { db, getActivePlanVersionId } from '../db';
-import { addDays, fmtNum, isoDate, parseIsoDate, weekStart } from '../logic';
+import { addDays, fmtClock, fmtNum, isoDate, parseIsoDate, weekStart } from '../logic';
 import { exerciseSeries, personalRecords, weekHardSets, weeklyTargets } from '../stats';
 
 const axis = { fontSize: 12, fill: 'var(--text-2)' };
@@ -184,7 +184,7 @@ export function StatsScreen() {
                   {records.longest !== null && (
                     <tr>
                       <td>Längste Dauer</td>
-                      <td>{records.longest} s</td>
+                      <td>{fmtClock(records.longest)} min</td>
                     </tr>
                   )}
                   {records.bestVolume !== null && (

@@ -38,12 +38,11 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
     ...slots.filter((s) => !workout.slotOrder.includes(s.id)),
   ];
 
-  // Free slots swap with the next free slot; fixed slots never move.
+  // Any exercise can be moved during the session (a machine may be busy).
+  // "fest" from the plan stays visible as a hint only.
   const neighbour = (index: number, dir: -1 | 1): number => {
-    for (let i = index + dir; i >= 0 && i < ordered.length; i += dir) {
-      if (!ordered[i].orderFixed) return i;
-    }
-    return -1;
+    const j = index + dir;
+    return j >= 0 && j < ordered.length ? j : -1;
   };
 
   const move = (index: number, dir: -1 | 1) => {
@@ -75,16 +74,19 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
     onClose(null);
   };
 
-  const elapsed = (workout.end ?? now) - workout.start;
+  // Same definition as in the day view: first set to last set (while running: until now)
+  const stamps = sets.map((s) => s.timestamp);
+  const elapsed = stamps.length ? (workout.end ?? now) - Math.min(...stamps) : 0;
 
   return (
     <div className="screen">
-      {mode === 'edit' && (
-        <button className="back" onClick={() => onClose(null)}>
-          ‹ Zurück
-        </button>
-      )}
-      <p className="label">{mode === 'live' ? 'Läuft' : 'Bearbeiten'} · {fmtDuration(elapsed)}</p>
+      <button className="back" onClick={() => onClose(null)}>
+        ‹ {mode === 'live' ? 'Trainingstage' : 'Zurück'}
+      </button>
+      <p className="label">
+        {mode === 'live' ? 'Läuft' : 'Bearbeiten'}
+        {stamps.length > 0 && ` · Trainingszeit ${fmtDuration(elapsed)}`}
+      </p>
       <h1 className="title">{template?.name ?? 'Training'}</h1>
 
       <div className="pair section-sm">

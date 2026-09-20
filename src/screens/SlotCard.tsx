@@ -6,6 +6,7 @@ import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet 
 import {
   SIDE_LABEL,
   WEIGHT_STEP,
+  fmtClock,
   fmtNum,
   fmtRest,
   fmtTarget,
@@ -66,7 +67,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
   const lastText = (setNumber: number, side: Side): string => {
     const p = prevBySide(side).find((s) => s.setNumber === setNumber);
     if (!p) return '';
-    const v = ex.type === 'time' ? `${p.duration} s` : `${p.reps}`;
+    const v = ex.type === 'time' ? fmtClock(p.duration ?? 0) + ' min' : `${p.reps}`;
     const w = ex.bodyweight && p.weight === 0 ? 'KG' : `${fmtNum(p.weight)} kg`;
     return `zuletzt ${w} × ${v}`;
   };
@@ -130,16 +131,12 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
         <span className="label grow flush">
           {slot.name}
         </span>
-        {!slot.orderFixed && (
-          <>
-            <button className="icon-btn" aria-label="Nach oben" disabled={!canMoveUp} onClick={() => onMove(-1)}>
-              ↑
-            </button>
-            <button className="icon-btn" aria-label="Nach unten" disabled={!canMoveDown} onClick={() => onMove(1)}>
-              ↓
-            </button>
-          </>
-        )}
+        <button className="icon-btn" aria-label="Nach oben" disabled={!canMoveUp} onClick={() => onMove(-1)}>
+          ↑
+        </button>
+        <button className="icon-btn" aria-label="Nach unten" disabled={!canMoveDown} onClick={() => onMove(1)}>
+          ↓
+        </button>
       </div>
 
       {options.length > 1 ? (
@@ -165,7 +162,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
         <span>
           Pause <b>{fmtRest(slot.restMin, slot.restMax)}</b>
         </span>
-        <span>{slot.orderFixed ? 'fest' : 'frei'}</span>
+        <span>{slot.orderFixed ? 'Reihenfolge fest geplant' : 'frei'}</span>
         {partner && <span>Supersatz mit {partner}</span>}
         {ex.unilateral && <span>einseitig</span>}
         {ex.bodyweight && <span>KG + Zusatzgewicht</span>}
@@ -186,10 +183,17 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       )}
 
       <div className="sets">
-        <div className="set-head">
+        <div className={`set-head${ex.type === 'time' ? ' time' : ''}`}>
           <span />
           <span>{ex.bodyweight ? '+ kg' : 'kg'}</span>
-          <span>{ex.type === 'time' ? 'Sek.' : 'Wdh'}</span>
+          {ex.type === 'time' ? (
+            <>
+              <span>Min</span>
+              <span>Sek</span>
+            </>
+          ) : (
+            <span>Wdh</span>
+          )}
           <span />
         </div>
         {Array.from({ length: rowCount }, (_, i) => i + 1).map((n) =>

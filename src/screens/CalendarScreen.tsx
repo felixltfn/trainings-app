@@ -1,9 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useRef, useState } from 'react';
 
-import { bodyweightFor } from '../data';
 import { db } from '../db';
-import { fmtNum, isoDate, setVolume } from '../logic';
+import { isoDate } from '../logic';
 import { DayView } from './DayView';
 
 interface Props {
@@ -21,14 +20,12 @@ export function CalendarScreen({ openDay, onOpenDay }: Props) {
 
   const data = useLiveQuery(async () => {
     const workouts = await db.workouts.toArray();
-    const sets = await db.sets.toArray();
     const templates = new Map((await db.templates.toArray()).map((t) => [t.id, t]));
-    const exercises = new Map((await db.exercises.toArray()).map((e) => [e.id, e]));
-    return { workouts, sets, templates, exercises };
+    return { workouts, templates };
   }, []);
 
   if (!data) return <div className="screen" />;
-  const { workouts, sets, templates, exercises } = data;
+  const { workouts, templates } = data;
 
   const year = month.getFullYear();
   const m = month.getMonth();
@@ -40,18 +37,6 @@ export function CalendarScreen({ openDay, onOpenDay }: Props) {
   );
 
   const monthWorkouts = workouts.filter((w) => w.date.startsWith(`${year}-${String(m + 1).padStart(2, '0')}`));
-  const monthVolume = monthWorkouts.reduce((sum, w) => {
-    const bw = bodyweightFor(w, workouts);
-    return (
-      sum +
-      sets
-        .filter((s) => s.workoutId === w.id)
-        .reduce((v, s) => {
-          const ex = exercises.get(s.exerciseId);
-          return ex ? v + setVolume(s, ex, bw) : v;
-        }, 0)
-    );
-  }, 0);
   const target = Math.round((daysInMonth / 7) * WORKOUTS_PER_WEEK);
 
   const shift = (delta: number) => setMonth(new Date(year, m + delta, 1));
@@ -71,7 +56,7 @@ export function CalendarScreen({ openDay, onOpenDay }: Props) {
         </div>
       </div>
 
-      <div className="stats-row section-sm">
+      <div className="stats-row two section-sm">
         <div className="stat">
           <p className="label">Trainings</p>
           <div className="big-num">{monthWorkouts.length}</div>
@@ -79,10 +64,6 @@ export function CalendarScreen({ openDay, onOpenDay }: Props) {
         <div className="stat">
           <p className="label">Soll</p>
           <div className="big-num muted">{target}</div>
-        </div>
-        <div className="stat">
-          <p className="label">Volumen</p>
-          <div className="big-num">{fmtNum(Math.round(monthVolume / 1000))}<span className="small"> t</span></div>
         </div>
       </div>
 

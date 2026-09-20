@@ -147,6 +147,15 @@ export function sidesOf(ex: Exercise): WorkoutSet['side'][] {
 
 export const SIDE_LABEL: Record<WorkoutSet['side'], string> = { both: '', left: 'L', right: 'R' };
 
-export function workoutDuration(w: Workout): number | null {
+// Training time = from the first to the last logged set. Only if that is not
+// possible (no sets) we fall back to the start/end times of the session.
+export function trainingTime(w: Workout, sets: WorkoutSet[]): number | null {
+  const stamps = sets.filter((s) => s.workoutId === w.id).map((s) => s.timestamp);
+  if (stamps.length >= 2) return Math.max(...stamps) - Math.min(...stamps);
   return w.end ? w.end - w.start : null;
+}
+
+// 150 -> { min: 2, sec: 30 }
+export function splitTime(totalSeconds: number): { min: number; sec: number } {
+  return { min: Math.floor(totalSeconds / 60), sec: totalSeconds % 60 };
 }

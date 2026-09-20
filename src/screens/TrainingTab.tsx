@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useState } from 'react';
 
 import { startWorkout, suggestNextTemplateId } from '../data';
-import { db, getActivePlanVersionId, getMeta, type Slot } from '../db';
+import { db, getActivePlanVersionId, type Slot } from '../db';
 import type { TimerState } from '../timer';
 import { WorkoutScreen } from './WorkoutScreen';
 
@@ -10,10 +11,10 @@ interface Props {
   onFinished: (date: string) => void;
 }
 
-const DAY_MS = 86400000;
-
 export function TrainingTab({ onSetDone, onFinished }: Props) {
-  // A workout without end time is the one in progress
+  // "‹ Trainingstage" inside a running workout goes back to this list without ending it
+  const [showList, setShowList] = useState(false);
+
   // null = no workout running; undefined = still loading
   const running = useLiveQuery(async () => (await db.workouts.filter((w) => w.end === null).last()) ?? null, []);
   const home = useLiveQuery(async () => {
@@ -22,14 +23,12 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
     const slotCounts = new Map<number, number>();
     for (const t of templates) slotCounts.set(t.id, await db.slots.where('templateId').equals(t.id).count());
     const nextId = await suggestNextTemplateId(templates.map((t) => t.id));
-    const lastExport = await getMeta<number>('lastExport');
-    const workoutCount = await db.workouts.count();
-    return { templates, slotCounts, nextId, lastExport, workoutCount };
+    return { templates, slotCounts, nextId };
   }, []);
 
   if (running === undefined || !home) return <div className="screen" />;
 
-  if (running) {
+  if (running && !showList) {
     const startTimer = (slot: Slot) => {
       if (slot.restMin > 0) onSetDone({ startedAt: Date.now(), min: slot.restMin, max: slot.restMax });
     };
@@ -38,63 +37,54 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
         workoutId={running.id}
         mode="live"
         onSetDone={startTimer}
-        onClose={(date) => {
-          onSetDone(null);
-          if (date) onFinished(date);
+        onClose={(finishedDate) => {
+          setShowList(true);
+          if (finishedDate) {
+            onSetDone(null);
+            onFinished(finishedDate);
+          }
         }}
       />
     );
   }
 
-  const { templates, slotCounts, nextId, lastExport, workoutCount } = home;
-  const next = templates.find((t) => t.id === nextId);
-  const exportDue = workoutCount > 0 && (!lastExport || Date.now() - lastExport > 14 * DAY_MS);
-  const start = (id: number) => startWorkout(id);
+  const { templates, slotCounts, nextId } = home;
   const exerciseCount = (n: number | undefined) => `${n ?? 0} ${n === 1 ? 'Übung' : 'Übungen'}`;
+  const start = async (id: number) => {
+    await startWorkout(id);
+    setShowList(false);
+  };
 
   return (
     <div className="screen">
-      <p className="label">
-        {new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
-      </p>
-      <h1 className="title">Training</h1>
+      <p className="label">Training</p>
+      <h1 className="title">Trainingstage</h1>
 
-      {exportDue && (
-        <div className="banner section-sm">
-          <span className="grow">
-            {lastExport
-              ? `Letztes Backup vor ${Math.floor((Date.now() - lastExport) / DAY_MS)} Tagen.`
-              : 'Noch kein Backup exportiert.'}{' '}
-            Export unter Einstellungen.
-          </span>
-        </div>
-      )}
-
-      {next && (
-        <div className="section">
-          <p className="label">Als Nächstes</p>
-          <div className="big-num">{next.name}</div>
-          <p className="muted">{exerciseCount(slotCounts.get(next.id))}</p>
-          <button className="btn block" onClick={() => start(next.id)}>
-            {next.name} starten
+      {running && (
+        <div className="section-sm">
+          <button className="btn block" onClick={() => setShowList(false)}>
+            Laufendes Training fortsetzen
           </button>
+          <p className="small muted section-sm">
+            Solange ein Training läuft, kannst du keinen zweiten Tag starten. Beende oder verwirf es zuerst.
+          </p>
         </div>
       )}
 
       <div className="section">
-        <p className="label">Alle Trainingstage</p>
         <div className="list">
           {templates.map((t) => (
-            <button key={t.id} className="list-item chevron" onClick={() => start(t.id)}>
+            <button key={t.id} className="list-item chevron" disabled={!!running} onClick={() => start(t.id)}>
               <span className="cal-mark">{t.short}</span>
               <span className="grow">
                 {t.name}
                 <span className="muted small"> · {exerciseCount(slotCounts.get(t.id))}</span>
+                {t.id === nextId && !running && <span className="accent small"> · als Nächstes</span>}
               </span>
             </button>
           ))}
         </div>
-        {templates.length === 0 && <p className="muted">Keine Trainingstage. Lege unter Einstellungen einen an.</p>}
+        {templates.length === 0 && <p className="muted">Keine Trainingstage. Lege unter „Plan“ einen an.</p>}
       </div>
     </div>
   );
