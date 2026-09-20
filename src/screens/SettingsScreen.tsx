@@ -6,6 +6,7 @@ import { copyPlan, createPlan } from '../data';
 import { db, getActivePlanVersionId, getMeta, setMeta } from '../db';
 import { generateTestData, resetEverything } from '../devdata';
 import { isoDate } from '../logic';
+import { exportMarkdown } from '../obsidian';
 import { ExerciseEditor } from './ExerciseEditor';
 import { TemplateEditor } from './TemplateEditor';
 
@@ -69,8 +70,8 @@ export function SettingsScreen() {
     const name = newName.trim();
     if (!name) return;
     setNewName('');
-    // First free letter of the name, so two days never share a short label
-    const taken = new Set((days ?? []).map((t) => t.short.toUpperCase()));
+    // First free letter of the name – short labels are unique across all plans
+    const taken = new Set((await db.templates.toArray()).map((t) => t.short.trim().toUpperCase()));
     const candidates = [...name.toUpperCase().replace(/[^A-Z0-9]/g, ''), ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
     const short = candidates.find((c) => !taken.has(c)) ?? '•';
     const id = await db.templates.add({ planVersionId: planId, name, short, order: days?.length ?? 0 });
@@ -279,7 +280,8 @@ export function SettingsScreen() {
         <p className="label">Daten</p>
         <p className="small muted">
           Alles liegt nur auf diesem Gerät. Letztes Backup:{' '}
-          {lastExport ? new Date(lastExport).toLocaleDateString('de-DE') : 'noch nie'}.
+          {lastExport ? new Date(lastExport).toLocaleDateString('de-DE') : 'noch nie'}. Das JSON-Backup ist zum
+          Wiederherstellen da, das Markdown zum Nachlesen im Vault.
         </p>
         <div className="stack section-sm">
           <button className="btn block" onClick={() => run(exportBackup)}>
@@ -287,6 +289,9 @@ export function SettingsScreen() {
           </button>
           <button className="btn secondary block" onClick={() => fileInput.current?.click()}>
             Backup importieren
+          </button>
+          <button className="btn secondary block" onClick={() => run(exportMarkdown)}>
+            Für Obsidian exportieren (Markdown)
           </button>
           <input
             ref={fileInput}

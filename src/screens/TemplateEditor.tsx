@@ -21,19 +21,16 @@ export function TemplateEditor({ templateId, onClose }: Props) {
     const slots = await db.slots.where('templateId').equals(templateId).sortBy('position');
     const exercises = new Map((await db.exercises.toArray()).map((e) => [e.id, e]));
     const workoutCount = await db.workouts.where('templateId').equals(templateId).count();
-    // Other days of the same plan – their short labels must stay unique
-    const siblings = template
-      ? (await db.templates.where('planVersionId').equals(template.planVersionId).toArray()).filter(
-          (t) => t.id !== templateId,
-        )
-      : [];
-    return { template, slots, exercises, workoutCount, siblings };
+    // Short labels must be unique across ALL plans – the calendar shows them side by side
+    const others = (await db.templates.toArray()).filter((t) => t.id !== templateId);
+    const plans = new Map((await db.planVersions.toArray()).map((p) => [p.id, p.name]));
+    return { template, slots, exercises, workoutCount, others, plans };
   }, [templateId]);
 
   if (!data?.template) return <div className="sheet" />;
   if (openSlot !== null) return <SlotEditor slotId={openSlot} onClose={() => setOpenSlot(null)} />;
 
-  const { template, slots, exercises, workoutCount, siblings } = data;
+  const { template, slots, exercises, workoutCount, others, plans } = data;
   const value = draft ?? { name: template.name, short: template.short };
   const slotOrder = order ?? slots.map((s) => s.id);
   const orderedSlots = slotOrder.map((id) => slots.find((s) => s.id === id)).filter((s): s is Slot => !!s);
@@ -57,9 +54,12 @@ export function TemplateEditor({ templateId, onClose }: Props) {
       setError('Das Kürzel darf nicht leer sein – es steht im Kalender.');
       return;
     }
-    const clash = siblings.find((t) => t.short.trim().toUpperCase() === short);
+    const clash = others.find((t) => t.short.trim().toUpperCase() === short);
     if (clash) {
-      setError(`Das Kürzel „${short}“ gehört schon zu „${clash.name}“. Wähle ein anderes.`);
+      const plan = plans.get(clash.planVersionId);
+      setError(
+        `Das Kürzel „${short}“ ist schon für „${clash.name}“${plan ? ` (Plan ${plan})` : ''} vergeben. Bitte ein anderes wählen.`,
+      );
       return;
     }
     await db.transaction('rw', db.templates, db.slots, async () => {

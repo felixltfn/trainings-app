@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { previousSession } from '../data';
 import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet } from '../db';
 import { SIDE_LABEL, WEIGHT_STEP, fmtClock, fmtNum, fmtRest, reachedTop, sidesOf, slotTargets } from '../logic';
+import { Picker } from '../Picker';
 import { SetRow, type Prefill, type SetValues } from './SetRow';
 
 interface Props {
@@ -146,14 +147,17 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       </div>
 
       {options.length > 1 ? (
-        <select className="select slot-select" value={exerciseId} onChange={(e) => choose(Number(e.target.value))}>
-          {options.map((id) => (
-            <option key={id} value={id}>
-              {exercises.get(id)?.name ?? '?'}
-              {id === slot.exerciseId ? '' : ' (Alt.)'}
-            </option>
-          ))}
-        </select>
+        <Picker
+          big
+          title="Übung für diesen Slot"
+          value={exerciseId}
+          options={options.map((id) => ({
+            value: id,
+            label: exercises.get(id)?.name ?? '?',
+            hint: id === slot.exerciseId ? 'Standard' : 'Alternative',
+          }))}
+          onChange={(v) => choose(Number(v))}
+        />
       ) : (
         <div className="h2 slot-select">{ex.name}</div>
       )}

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { buildBackup, importBackup } from './backup';
-import { seedIfEmpty } from './seed';
+import { applyPlanFixes, seedIfEmpty } from './seed';
 import './styles.css';
 
 async function boot(): Promise<void> {
@@ -12,6 +12,7 @@ async function boot(): Promise<void> {
     navigator.storage.persist().catch((e: unknown) => console.warn('storage.persist failed', e));
   }
   await seedIfEmpty();
+  await applyPlanFixes();
   // Test hook for the dev console (not part of the production build)
   if (import.meta.env.DEV) Object.assign(window, { backupTools: { buildBackup, importBackup } });
   createRoot(document.getElementById('root')!).render(

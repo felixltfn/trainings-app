@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
+import { Picker } from '../Picker';
 import { db, type Exercise } from '../db';
 import { MUSCLES } from '../seed';
 
@@ -76,14 +77,15 @@ export function ExerciseEditor({ exerciseId, onClose }: Props) {
           <input className="input" value={value.name} onChange={(e) => patch({ name: e.target.value })} />
         </label>
 
-        <label className="field">
+        <div className="field">
           <span>Hauptmuskel</span>
-          <select className="select" value={value.primaryMuscle} onChange={(e) => patch({ primaryMuscle: e.target.value })}>
-            {MUSCLES.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
-        </label>
+          <Picker
+            title="Hauptmuskel"
+            value={value.primaryMuscle}
+            options={MUSCLES.map((m) => ({ value: m, label: m }))}
+            onChange={(v) => patch({ primaryMuscle: String(v) })}
+          />
+        </div>
 
         <div className="field">
           <span>Nebenmuskeln (zählen als halbe Sätze)</span>

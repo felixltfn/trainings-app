@@ -191,3 +191,58 @@ export async function seedIfEmpty(): Promise<void> {
     await setMeta('activePlanVersionId', planVersionId);
   });
 }
+
+// ---------- One-off corrections for databases created before these plan changes ----------
+// Runs once (guarded by a flag in `meta`), so later edits of your own are never overwritten.
+export async function applyPlanFixes(): Promise<void> {
+  if (await db.meta.get('planFixes1')) return;
+
+  await db.transaction('rw', [db.exercises, db.slots, db.sets, db.meta], async () => {
+    const all = await db.exercises.toArray();
+    const sitting = all.find((e) => e.name === 'Beinbeuger sitzend');
+    const lying = all.find((e) => e.name === 'Beinbeuger liegend');
+
+    // "Beinbeuger sitzend" is replaced by the lying version everywhere in the plan
+    if (sitting && lying) {
+      for (const slot of await db.slots.toArray()) {
+        const patch: Partial<Slot> = {};
+        if (slot.exerciseId === sitting.id) patch.exerciseId = lying.id;
+        const alts = slot.alternativeIds.map((id) => (id === sitting.id ? lying.id : id));
+        const unique = [...new Set(alts)].filter((id) => id !== (patch.exerciseId ?? slot.exerciseId));
+        if (unique.join() !== slot.alternativeIds.join()) patch.alternativeIds = unique;
+        if (Object.keys(patch).length > 0) await db.slots.update(slot.id, patch);
+      }
+      // Only remove the exercise itself when no sets are attached to it
+      if ((await db.sets.where('exerciseId').equals(sitting.id).count()) === 0) {
+        await db.exercises.delete(sitting.id);
+      }
+    }
+
+    // Standing calf raise is a bodyweight exercise (weight field = extra load)
+    const calf = all.find((e) => e.name === 'Wadenheben stehend');
+    if (calf && !calf.bodyweight) await db.exercises.update(calf.id, { bodyweight: true });
+
+    // These pairs are no longer supersets
+    const unpair = ['Waden', 'Bauch', 'Brust Isolation', 'Seitliche Schulter'];
+    for (const slot of await db.slots.toArray()) {
+      if (slot.supersetGroup && unpair.includes(slot.name)) {
+        await db.slots.update(slot.id, { supersetGroup: null });
+      }
+    }
+
+    // Clean up superset groups that lost their partner
+    const byTemplate = new Map<number, Slot[]>();
+    for (const slot of await db.slots.toArray()) {
+      byTemplate.set(slot.templateId, [...(byTemplate.get(slot.templateId) ?? []), slot]);
+    }
+    for (const group of byTemplate.values()) {
+      for (const slot of group) {
+        if (slot.supersetGroup && group.filter((s) => s.supersetGroup === slot.supersetGroup).length < 2) {
+          await db.slots.update(slot.id, { supersetGroup: null });
+        }
+      }
+    }
+
+    await db.meta.put({ key: 'planFixes1', value: Date.now() });
+  });
+}

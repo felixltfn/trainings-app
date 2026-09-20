@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+import { Picker } from '../Picker';
 import { db, getActivePlanVersionId } from '../db';
 import { addDays, fmtClock, fmtNum, isoDate, parseIsoDate, weekStart } from '../logic';
 import { exerciseSeries, personalRecords, weekHardSets, weeklyTargets } from '../stats';
@@ -125,17 +126,12 @@ export function StatsScreen() {
         {trained.length === 0 ? (
           <p className="muted">Sobald du Sätze einträgst, erscheinen hier Diagramme.</p>
         ) : (
-          <select
-            className="select"
+          <Picker
+            title="Übung auswählen"
             value={current?.id ?? ''}
-            onChange={(e) => setExerciseId(Number(e.target.value))}
-          >
-            {trained.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+            options={trained.map((e) => ({ value: e.id, label: e.name, hint: e.primaryMuscle }))}
+            onChange={(v) => setExerciseId(Number(v))}
+          />
         )}
       </div>
 

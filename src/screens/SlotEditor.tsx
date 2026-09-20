@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
+import { Picker } from '../Picker';
 import { db, type Slot } from '../db';
 import { ExerciseEditor } from './ExerciseEditor';
 
@@ -70,16 +71,15 @@ export function SlotEditor({ slotId, onClose }: Props) {
           <input className="input" value={value.name} onChange={(e) => patch({ name: e.target.value })} />
         </label>
 
-        <label className="field">
+        <div className="field">
           <span>Standardübung</span>
-          <select className="select" value={value.exerciseId} onChange={(e) => patch({ exerciseId: Number(e.target.value) })}>
-            {exercises.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Picker
+            title="Standardübung"
+            value={value.exerciseId}
+            options={exercises.map((e) => ({ value: e.id, label: e.name, hint: e.primaryMuscle }))}
+            onChange={(v) => patch({ exerciseId: Number(v) })}
+          />
+        </div>
         <button className="btn ghost" onClick={() => setNewExercise('default')}>
           + Neue Übung anlegen und als Standard setzen
         </button>
@@ -97,23 +97,17 @@ export function SlotEditor({ slotId, onClose }: Props) {
               </button>
             ))}
           </div>
-          <select
-            className="select section-sm"
-            value=""
-            onChange={(e) => {
-              const id = Number(e.target.value);
-              if (id) patch({ alternativeIds: [...value.alternativeIds, id] });
-            }}
-          >
-            <option value="">Alternative hinzufügen …</option>
-            {exercises
-              .filter((e) => !inSlot.includes(e.id))
-              .map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-          </select>
+          <div className="section-sm">
+            <Picker
+              title="Alternative hinzufügen"
+              value=""
+              placeholder="Alternative hinzufügen …"
+              options={exercises
+                .filter((e) => !inSlot.includes(e.id))
+                .map((e) => ({ value: e.id, label: e.name, hint: e.primaryMuscle }))}
+              onChange={(v) => patch({ alternativeIds: [...value.alternativeIds, Number(v)] })}
+            />
+          </div>
           <button className="btn ghost" onClick={() => setNewExercise('alternative')}>
             + Neue Übung anlegen und als Alternative hinzufügen
           </button>
@@ -129,21 +123,15 @@ export function SlotEditor({ slotId, onClose }: Props) {
               onChange={(e) => patch({ sets: Number(e.target.value) || 0 })}
             />
           </label>
-          <label className="field">
+          <div className="field">
             <span>Supersatz-Gruppe</span>
-            <select
-              className="select"
+            <Picker
+              title="Supersatz-Gruppe"
               value={value.supersetGroup ?? ''}
-              onChange={(e) => patch({ supersetGroup: e.target.value || null })}
-            >
-              <option value="">keine</option>
-              {GROUPS.map((g) => (
-                <option key={g} value={g}>
-                  Gruppe {g}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={[{ value: '', label: 'keine' }, ...GROUPS.map((g) => ({ value: g, label: `Gruppe ${g}` }))]}
+              onChange={(v) => patch({ supersetGroup: String(v) || null })}
+            />
+          </div>
         </div>
 
         <div className="pair">
