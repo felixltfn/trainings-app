@@ -58,5 +58,9 @@ function png(size) {
 
 writeFileSync('public/icon-192.png', png(192));
 writeFileSync('public/icon-512.png', png(512));
+// iOS picks the icon when the page is added to the home screen – offer every common size
 writeFileSync('public/apple-touch-icon.png', png(180));
+writeFileSync('public/apple-touch-icon-167.png', png(167));
+writeFileSync('public/apple-touch-icon-152.png', png(152));
+writeFileSync('public/apple-touch-icon-120.png', png(120));
 console.log('Icons written to public/');

@@ -45,7 +45,8 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
 
   const streak = weeklyStreak(workouts, WORKOUTS_PER_WEEK);
 
-  const exportDue = workouts.length > 0 && (!lastExport || Date.now() - lastExport > 14 * DAY_MS);
+  const daysSinceExport = lastExport ? Math.floor((Date.now() - lastExport) / DAY_MS) : null;
+  const exportDue = workouts.length > 0 && (daysSinceExport === null || daysSinceExport >= 14);
 
   const start = async (templateId: number) => {
     await startWorkout(templateId);
@@ -59,14 +60,27 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
       </p>
       <h1 className="title">Übersicht</h1>
 
-      {exportDue && (
-        <button className="banner section-sm" onClick={onGoToSettings}>
+      {exportDue ? (
+        <button className="banner urgent section-sm" onClick={onGoToSettings}>
           <span className="grow">
-            {lastExport
-              ? `Letztes Backup vor ${Math.floor((Date.now() - lastExport) / DAY_MS)} Tagen.`
-              : 'Noch kein Backup exportiert.'}{' '}
+            <b>Backup fällig.</b>{' '}
+            {daysSinceExport === null
+              ? 'Du hast noch nie eines exportiert – deine Daten liegen nur auf diesem Gerät.'
+              : `Das letzte ist ${daysSinceExport} Tage her.`}{' '}
             Jetzt sichern ›
           </span>
+        </button>
+      ) : (
+        <button className="backup-line section-sm" onClick={onGoToSettings}>
+          <span className="grow">
+            Letztes Backup:{' '}
+            {daysSinceExport === null
+              ? 'noch keines'
+              : daysSinceExport === 0
+                ? 'heute'
+                : `vor ${daysSinceExport} ${daysSinceExport === 1 ? 'Tag' : 'Tagen'}`}
+          </span>
+          <span className="muted">›</span>
         </button>
       )}
 
@@ -96,7 +110,10 @@ export function OverviewScreen({ onGoToWorkout, onOpenDay, onGoToSettings }: Pro
       <div className="section">
         <p className="label">Wochen-Streak</p>
         <div className="row">
-          <div className="big-num streak-num">{streak.current}</div>
+          <div className="big-num streak-num">
+            {streak.current}
+            {streak.current > 0 && <span className="flame"> 🔥</span>}
+          </div>
           <div className="grow small">
             {streak.current === 0
               ? `Noch ${streak.missing} ${streak.missing === 1 ? 'Training' : 'Trainings'} diese Woche, dann startet die Streak.`

@@ -15,8 +15,17 @@ const tooltipNum = (decimals: number) => (v: unknown) => (typeof v === 'number' 
 // Four-digit volumes would be cut off on the axis, so they are shown as "2,4k".
 const compact = (v: number) => (Math.abs(v) >= 1000 ? `${fmtNum(v / 1000, 1)}k` : fmtNum(v));
 
+// Time window for the charts. A week would leave one or two points, so the shortest is a month.
+const RANGES = [
+  { id: '1m', label: '1 Monat', months: 1 },
+  { id: '3m', label: '3 Monate', months: 3 },
+  { id: '1y', label: '1 Jahr', months: 12 },
+  { id: 'max', label: 'Max', months: 0 },
+] as const;
+
 export function StatsScreen() {
   const [exerciseId, setExerciseId] = useState<number | null>(null);
+  const [range, setRange] = useState<(typeof RANGES)[number]['id']>('3m');
   const [week, setWeek] = useState(() => weekStart(new Date()));
 
   const data = useLiveQuery(async () => {
@@ -38,12 +47,18 @@ export function StatsScreen() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const current = exercises.get(exerciseId ?? trained[0]?.id ?? -1);
 
-  const series = current ? exerciseSeries(current, sets, workouts) : [];
-  const records = current ? personalRecords(current, series, sets, workouts) : null;
+  // Records always look at the whole history, the charts only at the chosen window
+  const fullSeries = current ? exerciseSeries(current, sets, workouts) : [];
+  const records = current ? personalRecords(current, fullSeries, sets, workouts) : null;
+
+  const months = RANGES.find((r) => r.id === range)?.months ?? 0;
+  const cutoff = months > 0 ? isoDate(new Date(new Date().setMonth(new Date().getMonth() - months))) : '';
+  const inRange = (date: string) => date >= cutoff;
+  const series = fullSeries.filter((p) => inRange(p.date));
 
   // Bodyweight over time: one point per workout where a weight was entered
   const bodyweightSeries = workouts
-    .filter((w) => w.bodyweight !== null)
+    .filter((w) => w.bodyweight !== null && inRange(w.date))
     .sort((a, b) => a.start - b.start)
     .map((w) => ({ date: w.date, bodyweight: w.bodyweight }));
 
@@ -101,6 +116,17 @@ export function StatsScreen() {
         </div>
       </div>
 
+      <div className="section">
+        <p className="label">Zeitraum der Diagramme</p>
+        <div className="segmented">
+          {RANGES.map((r) => (
+            <button key={r.id} className={range === r.id ? 'on' : ''} onClick={() => setRange(r.id)}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {bodyweightSeries.length > 0 && (
         <div className="section">
           <p className="label">Körpergewicht (kg)</p>
@@ -134,6 +160,12 @@ export function StatsScreen() {
           />
         )}
       </div>
+
+      {current && series.length === 0 && (
+        <p className="muted section">
+          Für „{current.name}“ liegt in diesem Zeitraum kein Training. Wähle einen längeren Zeitraum.
+        </p>
+      )}
 
       {current && series.length > 0 && (
         <>

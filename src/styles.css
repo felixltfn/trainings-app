@@ -925,3 +925,26 @@ button.banner {
 .picker-panel .list-item.on {
   font-weight: 600;
 }
+
+.flame {
+  font-size: 26px;
+}
+
+.banner.urgent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Quiet one-liner with the backup age */
+.backup-line {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: left;
+}
