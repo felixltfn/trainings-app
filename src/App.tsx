@@ -15,7 +15,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'training', label: 'Training', icon: 'M4 9v6M20 9v6M7 6v12M17 6v12M7 12h10' },
   { id: 'calendar', label: 'Kalender', icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4' },
   { id: 'stats', label: 'Statistik', icon: 'M5 20V11M12 20V4M19 20v-6' },
-  { id: 'settings', label: 'Plan', icon: 'M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4' },
+  { id: 'settings', label: 'Einstellungen', icon: 'M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4' },
 ];
 
 export function App() {

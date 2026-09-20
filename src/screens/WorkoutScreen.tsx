@@ -31,12 +31,14 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
 
   if (!workout || !slots || !exercises || !sets) return <div className="screen" />;
 
-  // Session order: stored order first, slots added to the template later are appended
+  // Session order: stored order first, slots added to the template later are appended.
+  // Exercises skipped for today are left out.
   const byId = new Map(slots.map((s) => [s.id, s]));
+  const skipped = workout.skippedSlots ?? [];
   const ordered = [
     ...workout.slotOrder.map((id) => byId.get(id)).filter((s): s is Slot => !!s),
     ...slots.filter((s) => !workout.slotOrder.includes(s.id)),
-  ];
+  ].filter((s) => !skipped.includes(s.id));
 
   // Any exercise can be moved during the session (a machine may be busy).
   // "fest" from the plan stays visible as a hint only.
@@ -61,6 +63,13 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
       .map((o) => `${o.position}. ${exercises.get(workout.choices[o.id] ?? o.exerciseId)?.name ?? o.name}`)
       .join(', ');
   };
+
+  // Skipping only affects this session and can be undone right below the list,
+  // so it needs no confirmation. Sets already entered stay saved.
+  const skip = (slot: Slot) => db.workouts.update(workout.id, { skippedSlots: [...skipped, slot.id] });
+
+  const unskip = (slotId: number) =>
+    db.workouts.update(workout.id, { skippedSlots: skipped.filter((id) => id !== slotId) });
 
   const finish = async () => {
     if (sets.length === 0 && !confirm('Noch kein Satz eingetragen. Trotzdem beenden?')) return;
@@ -125,9 +134,26 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
             canMoveDown={neighbour(i, 1) >= 0}
             onMove={(dir) => move(i, dir)}
             onSetDone={onSetDone}
+            onSkip={() => skip(slot)}
           />
         ))}
       </div>
+
+      {skipped.length > 0 && (
+        <div className="section-sm">
+          <p className="label">Heute gestrichen</p>
+          <div className="list">
+            {skipped.map((id) => (
+              <div key={id} className="list-item">
+                <span className="grow">{byId.get(id)?.name ?? 'Übung'}</span>
+                <button className="btn ghost" onClick={() => unskip(id)}>
+                  zurückholen
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <label className="field">
         <span>Notiz</span>
@@ -142,7 +168,7 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
         {mode === 'live' ? (
           <>
             <button className="btn block" onClick={finish}>
-              Training beenden
+              Training speichern
             </button>
             <button className="btn danger block" onClick={cancel}>
               Training verwerfen

@@ -1,4 +1,4 @@
-import { db, getActivePlanVersionId, type Slot, type Workout, type WorkoutSet } from './db';
+import { db, type Slot, type Workout, type WorkoutSet } from './db';
 import { isoDate } from './logic';
 
 // ---------- Workouts ----------
@@ -15,7 +15,8 @@ export async function startWorkout(templateId: number): Promise<number> {
     bodyweight: await latestBodyweight(),
     slotOrder: slots.map((s) => s.id),
     choices: Object.fromEntries(slots.map((s) => [s.id, s.exerciseId])),
-    extraSets: {},
+    setCounts: {},
+    skippedSlots: [],
   });
 }
 
@@ -67,13 +68,19 @@ export async function suggestNextTemplateId(templateIds: number[]): Promise<numb
 
 // ---------- Plan versions ----------
 
-// A new mesocycle starts as a copy of the active plan. Old workouts keep pointing at the old templates.
-export async function copyActivePlanVersion(name: string, start: string): Promise<number> {
-  const sourceId = await getActivePlanVersionId();
+// An empty training plan (PPL, Upper/Lower, full body, a new mesocycle …)
+export async function createPlan(name: string, start: string): Promise<number> {
+  const id = await db.planVersions.add({ name, start, end: null });
+  await db.meta.put({ key: 'activePlanVersionId', value: id });
+  return id;
+}
+
+// A copy of an existing plan, including its training days and slots.
+// Old workouts keep pointing at the old templates, so their history stays intact.
+export async function copyPlan(sourcePlanId: number, name: string, start: string): Promise<number> {
   return db.transaction('rw', [db.planVersions, db.templates, db.slots, db.meta], async () => {
-    if (sourceId) await db.planVersions.update(sourceId, { end: start });
     const newId = await db.planVersions.add({ name, start, end: null });
-    const templates = sourceId ? await db.templates.where('planVersionId').equals(sourceId).toArray() : [];
+    const templates = await db.templates.where('planVersionId').equals(sourcePlanId).toArray();
     for (const t of templates) {
       const { id: oldTemplateId, ...rest } = t;
       const templateId = await db.templates.add({ ...rest, planVersionId: newId });

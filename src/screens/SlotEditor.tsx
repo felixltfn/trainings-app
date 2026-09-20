@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
-import { db, type Slot, type SlotOverride } from '../db';
+import { db, type Slot } from '../db';
 import { ExerciseEditor } from './ExerciseEditor';
 
 interface Props {
@@ -32,17 +32,6 @@ export function SlotEditor({ slotId, onClose }: Props) {
     if (!confirm('Diesen Slot löschen? Bereits eingetragene Sätze bleiben erhalten.')) return;
     await db.slots.delete(slotId);
     onClose();
-  };
-
-  const setOverride = (exerciseId: number, field: keyof SlotOverride, raw: string) => {
-    const overrides = { ...value.overrides };
-    const entry: SlotOverride = { ...overrides[exerciseId] };
-    if (raw.trim() === '') delete entry[field];
-    else if (field === 'rir') entry.rir = raw;
-    else entry[field] = Number(raw);
-    if (Object.keys(entry).length === 0) delete overrides[exerciseId];
-    else overrides[exerciseId] = entry;
-    patch({ overrides });
   };
 
   if (newExercise) {
@@ -135,29 +124,19 @@ export function SlotEditor({ slotId, onClose }: Props) {
             />
           </label>
           <label className="field">
-            <span>RIR (nur Plannotiz)</span>
-            <input className="input" value={value.rir} onChange={(e) => patch({ rir: e.target.value })} />
-          </label>
-        </div>
-
-        <div className="pair">
-          <label className="field">
-            <span>Wdh/Sek. von</span>
-            <input
-              className="input num"
-              inputMode="numeric"
-              value={value.repMin}
-              onChange={(e) => patch({ repMin: Number(e.target.value) || 0 })}
-            />
-          </label>
-          <label className="field">
-            <span>bis</span>
-            <input
-              className="input num"
-              inputMode="numeric"
-              value={value.repMax}
-              onChange={(e) => patch({ repMax: Number(e.target.value) || 0 })}
-            />
+            <span>Supersatz-Gruppe</span>
+            <select
+              className="select"
+              value={value.supersetGroup ?? ''}
+              onChange={(e) => patch({ supersetGroup: e.target.value || null })}
+            >
+              <option value="">keine</option>
+              {GROUPS.map((g) => (
+                <option key={g} value={g}>
+                  Gruppe {g}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 
@@ -182,68 +161,9 @@ export function SlotEditor({ slotId, onClose }: Props) {
           </label>
         </div>
 
-        <label className="check section-sm">
-          <input type="checkbox" checked={value.orderFixed} onChange={(e) => patch({ orderFixed: e.target.checked })} />
-          Reihenfolge fest (lässt sich im Training nicht verschieben)
-        </label>
-
-        <label className="field">
-          <span>Supersatz-Gruppe (gleiche Gruppe = Supersatz)</span>
-          <select
-            className="select"
-            value={value.supersetGroup ?? ''}
-            onChange={(e) => patch({ supersetGroup: e.target.value || null })}
-          >
-            <option value="">keine</option>
-            {GROUPS.map((g) => (
-              <option key={g} value={g}>
-                Gruppe {g}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="section">
-          <p className="label">Abweichende Werte je Übung</p>
-          <p className="small muted">Leer lassen heißt: Wert aus dem Slot gilt.</p>
-          {inSlot.map((id) => {
-            const o = value.overrides[id] ?? {};
-            return (
-              <div key={id} className="section-sm">
-                <b>{nameOf(id)}</b>
-                <div className="row section-sm">
-                  <input
-                    className="input num"
-                    inputMode="numeric"
-                    placeholder="Sätze"
-                    value={o.sets ?? ''}
-                    onChange={(e) => setOverride(id, 'sets', e.target.value)}
-                  />
-                  <input
-                    className="input num"
-                    inputMode="numeric"
-                    placeholder="von"
-                    value={o.repMin ?? ''}
-                    onChange={(e) => setOverride(id, 'repMin', e.target.value)}
-                  />
-                  <input
-                    className="input num"
-                    inputMode="numeric"
-                    placeholder="bis"
-                    value={o.repMax ?? ''}
-                    onChange={(e) => setOverride(id, 'repMax', e.target.value)}
-                  />
-                  <input
-                    className="input"
-                    placeholder="RIR"
-                    value={o.rir ?? ''}
-                    onChange={(e) => setOverride(id, 'rir', e.target.value)}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <p className="small muted section-sm">
+          Übungen mit derselben Supersatz-Gruppe machst du direkt hintereinander.
+        </p>
 
         <div className="section stack">
           <button className="btn block" onClick={save}>

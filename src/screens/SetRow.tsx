@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 
-import type { ExerciseType, Side, WorkoutSet } from '../db';
-import { SIDE_LABEL, fmtNum, parseNum, splitTime } from '../logic';
+import type { ExerciseType, WorkoutSet } from '../db';
+import { fmtNum, parseNum, splitTime } from '../logic';
 
 export interface SetValues {
   weight: number;
   value: number; // reps, or seconds for type 'time'
-  drop: boolean;
 }
 
 export interface Prefill {
@@ -15,16 +14,12 @@ export interface Prefill {
 }
 
 interface Props {
-  setNumber: number;
-  side: Side;
+  label: string; // "2", "2 L", or "↓" for the drop set row
+  ariaLabel: string;
   type: ExerciseType;
   saved: WorkoutSet | undefined;
   prefill: Prefill;
-  showDetails: boolean;
-  extraRow: boolean; // a set added with "+ Satz" – its row can be removed completely
   onSave: (v: SetValues) => void;
-  onReset: () => void;
-  onRemoveRow: () => void;
 }
 
 const str = (n: number | null | undefined) => (n === null || n === undefined ? '' : fmtNum(n));
@@ -36,7 +31,7 @@ const asFields = (seconds: number | null) => {
   return { value: String(seconds), min: String(min), sec: String(sec) };
 };
 
-export function SetRow({ setNumber, side, type, saved, prefill, showDetails, extraRow, onSave, onReset, onRemoveRow }: Props) {
+export function SetRow({ label, ariaLabel, type, saved, prefill, onSave }: Props) {
   const isTime = type === 'time';
   const savedValue = saved ? (isTime ? saved.duration : saved.reps) : null;
   const initial = asFields(saved ? savedValue : prefill.value);
@@ -45,10 +40,10 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, ext
   const [value, setValue] = useState(initial.value);
   const [min, setMin] = useState(initial.min);
   const [sec, setSec] = useState(initial.sec);
-  const [drop, setDrop] = useState(saved?.drop ?? false);
   const [touched, setTouched] = useState(false);
 
-  // The previous session loads asynchronously: fill it in as long as the user hasn't typed yet.
+  // The prefill arrives late (previous session) and becomes empty after a reset:
+  // follow it as long as nothing is saved and the user hasn't typed.
   useEffect(() => {
     if (saved || touched) return;
     const f = asFields(prefill.value);
@@ -58,26 +53,25 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, ext
     setSec(f.sec);
   }, [prefill.weight, prefill.value, saved, touched]);
 
-  // Reset local state when the stored values change (compared by content, not object identity)
-  const savedKey = saved ? JSON.stringify([saved.id, saved.weight, saved.reps, saved.duration, saved.rir, saved.drop]) : '';
+  // Follow the stored values (compared by content, not object identity)
+  const savedKey = saved ? JSON.stringify([saved.id, saved.weight, saved.reps, saved.duration]) : '';
   useEffect(() => {
+    setTouched(false);
     if (!saved) return;
     const f = asFields(isTime ? saved.duration : saved.reps);
     setWeight(str(saved.weight));
     setValue(f.value);
     setMin(f.min);
     setSec(f.sec);
-    setDrop(saved.drop);
-    setTouched(false);
   }, [savedKey, saved, isTime]);
 
   const parsedWeight = parseNum(weight) ?? 0;
   const parsedValue = isTime ? (parseNum(min) ?? 0) * 60 + (parseNum(sec) ?? 0) : parseNum(value);
-  const dirty = !!saved && (parsedWeight !== saved.weight || parsedValue !== savedValue || drop !== saved.drop);
+  const dirty = !!saved && (parsedWeight !== saved.weight || parsedValue !== savedValue);
 
   const submit = () => {
     if (parsedValue === null || parsedValue <= 0) return;
-    onSave({ weight: parsedWeight, value: parsedValue, drop });
+    onSave({ weight: parsedWeight, value: parsedValue });
   };
 
   const edit = (setter: (s: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,90 +80,62 @@ export function SetRow({ setNumber, side, type, saved, prefill, showDetails, ext
   };
 
   const state = saved ? (dirty ? 'dirty' : 'saved') : '';
-  const label = `Satz ${setNumber} ${SIDE_LABEL[side]}`;
 
   return (
-    <>
-      <div className={`set-row${isTime ? ' time' : ''}`}>
-        <div className="set-no">
-          {setNumber}
-          {side !== 'both' && <small>{SIDE_LABEL[side]}</small>}
-        </div>
-        <input
-          className="num-input"
-          inputMode="decimal"
-          enterKeyHint="next"
-          placeholder="kg"
-          aria-label={`${label} Gewicht`}
-          value={weight}
-          onChange={edit(setWeight)}
-          onFocus={(e) => e.target.select()}
-        />
-        {isTime ? (
-          <>
-            <input
-              className="num-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Min"
-              aria-label={`${label} Minuten`}
-              value={min}
-              onChange={edit(setMin)}
-              onFocus={(e) => e.target.select()}
-            />
-            <input
-              className="num-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              enterKeyHint="done"
-              placeholder="Sek"
-              aria-label={`${label} Sekunden`}
-              value={sec}
-              onChange={edit(setSec)}
-              onFocus={(e) => e.target.select()}
-              onKeyDown={(e) => e.key === 'Enter' && submit()}
-            />
-          </>
-        ) : (
+    <div className={`set-row${isTime ? ' time' : ''}`}>
+      <div className="set-no">{label}</div>
+      <input
+        className="num-input"
+        inputMode="decimal"
+        enterKeyHint="next"
+        placeholder="kg"
+        aria-label={`${ariaLabel} Gewicht`}
+        value={weight}
+        onChange={edit(setWeight)}
+        onFocus={(e) => e.target.select()}
+      />
+      {isTime ? (
+        <>
+          <input
+            className="num-input"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="Min"
+            aria-label={`${ariaLabel} Minuten`}
+            value={min}
+            onChange={edit(setMin)}
+            onFocus={(e) => e.target.select()}
+          />
           <input
             className="num-input"
             inputMode="numeric"
             pattern="[0-9]*"
             enterKeyHint="done"
-            placeholder="Wdh"
-            aria-label={`${label} Wiederholungen`}
-            value={value}
-            onChange={edit(setValue)}
+            placeholder="Sek"
+            aria-label={`${ariaLabel} Sekunden`}
+            value={sec}
+            onChange={edit(setSec)}
             onFocus={(e) => e.target.select()}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
-        )}
-        <button className={`done-btn ${state}`} aria-label={saved ? 'Satz aktualisieren' : 'Satz speichern'} onClick={submit}>
-          ✓
-        </button>
-      </div>
-      {showDetails && (
-        <div className="set-extra">
-          <button
-            className={`toggle-btn${drop ? ' on' : ''}`}
-            aria-pressed={drop}
-            onClick={() => {
-              setTouched(true);
-              setDrop(!drop);
-            }}
-          >
-            Dropsatz
-          </button>
-          <button className="toggle-btn" disabled={!saved} onClick={onReset}>
-            Zurücksetzen
-          </button>
-          {extraRow && (
-            <button className="toggle-btn" onClick={onRemoveRow}>
-              Zeile entfernen
-            </button>
-          )}
-        </div>
+        </>
+      ) : (
+        <input
+          className="num-input"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          enterKeyHint="done"
+          placeholder="Wdh"
+          aria-label={`${ariaLabel} Wiederholungen`}
+          value={value}
+          onChange={edit(setValue)}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
       )}
-    </>
+      <button className={`done-btn ${state}`} aria-label={saved ? 'Satz aktualisieren' : 'Satz speichern'} onClick={submit}>
+        ✓
+      </button>
+    </div>
   );
 }

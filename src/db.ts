@@ -69,7 +69,8 @@ export interface Workout {
   // Session state so an interrupted workout can be resumed exactly
   slotOrder: number[];
   choices: Record<number, number>; // slotId -> chosen exerciseId
-  extraSets: Record<string, number>; // "slotId:exerciseId" -> sets added via "+ Satz"
+  setCounts: Record<string, number>; // "slotId:exerciseId" -> number of set rows (plan value if missing)
+  skippedSlots: number[]; // exercises dropped for this session only
 }
 
 export type Side = 'both' | 'left' | 'right';

@@ -16,10 +16,16 @@ interface Props {
   canMoveDown: boolean;
   onMove: (dir: -1 | 1) => void;
   onSetDone: (slot: Slot) => void;
+  onSkip: () => void;
 }
 
-export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, canMoveDown, onMove, onSetDone }: Props) {
+export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, canMoveDown, onMove, onSetDone, onSkip }: Props) {
   const [showDetails, setShowDetails] = useState(false);
+  // Set numbers with a drop set row that isn't saved yet
+  const [openDrops, setOpenDrops] = useState<number[]>([]);
+  // Rows that were reset stay empty instead of showing last time's values
+  const [cleared, setCleared] = useState<string[]>([]);
+
   const exerciseId = workout.choices[slot.id] ?? slot.exerciseId;
   const ex = exercises.get(exerciseId);
   const previous = useLiveQuery(() => previousSession(exerciseId, workout), [exerciseId, workout.id, workout.start]);
@@ -29,11 +35,8 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
   const targets = slotTargets(slot, exerciseId);
   const sides = sidesOf(ex);
   const mine = sets.filter((s) => s.slotId === slot.id && s.exerciseId === exerciseId);
-  const extraKey = `${slot.id}:${exerciseId}`;
-  const rowCount = Math.max(
-    targets.sets + (workout.extraSets[extraKey] ?? 0),
-    ...mine.map((s) => s.setNumber),
-  );
+  const key = `${slot.id}:${exerciseId}`;
+  const rowCount = Math.max(workout.setCounts[key] ?? targets.sets, ...mine.map((s) => s.setNumber), 1);
   // Sets done with another exercise of this slot (after switching) stay visible as a hint
   const otherExercises = [...new Set(sets.filter((s) => s.slotId === slot.id && s.exerciseId !== exerciseId).map((s) => s.exerciseId))];
 
@@ -42,9 +45,15 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
   // Progression: last time every set of this side hit the top of the range -> more weight today
   const progressed = new Map<Side, boolean>(sides.map((side) => [side, reachedTop(prevBySide(side), ex, targets)]));
 
-  const prefillFor = (setNumber: number, side: Side): Prefill => {
+  const savedSet = (n: number, side: Side, drop: boolean) =>
+    mine.find((s) => s.setNumber === n && s.side === side && s.drop === drop);
+
+  const clearKey = (n: number, side: Side, drop: boolean) => `${n}:${side}:${drop}`;
+
+  const prefillFor = (n: number, side: Side, drop: boolean): Prefill => {
+    if (drop || cleared.includes(clearKey(n, side, drop))) return { weight: null, value: null };
     const list = prevBySide(side);
-    const p = list.find((s) => s.setNumber === setNumber) ?? list[list.length - 1];
+    const p = list.find((s) => s.setNumber === n) ?? list[list.length - 1];
     if (!p) return { weight: ex.bodyweight ? 0 : null, value: null };
     const value = ex.type === 'time' ? p.duration : p.reps;
     if (progressed.get(side)) {
@@ -54,23 +63,22 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
     return { weight: p.weight, value };
   };
 
-  const lastText = (setNumber: number, side: Side): string => {
-    const p = prevBySide(side).find((s) => s.setNumber === setNumber);
+  const lastText = (n: number, side: Side): string => {
+    const p = prevBySide(side).find((s) => s.setNumber === n);
     if (!p) return '';
-    const v = ex.type === 'time' ? fmtClock(p.duration ?? 0) + ' min' : `${p.reps}`;
+    const v = ex.type === 'time' ? `${fmtClock(p.duration ?? 0)} min` : `${p.reps}`;
     const w = ex.bodyweight && p.weight === 0 ? 'KG' : `${fmtNum(p.weight)} kg`;
     return `zuletzt ${w} × ${v}`;
   };
 
-  const save = async (setNumber: number, side: Side, v: SetValues) => {
-    const existing = mine.find((s) => s.setNumber === setNumber && s.side === side);
+  const save = async (n: number, side: Side, drop: boolean, v: SetValues) => {
+    const existing = savedSet(n, side, drop);
     const fields = {
       weight: v.weight,
       reps: ex.type === 'time' ? null : v.value,
       duration: ex.type === 'time' ? v.value : null,
-      rir: existing?.rir ?? null, // RIR is no longer entered; old values stay untouched
-      drop: v.drop,
     };
+    setCleared(cleared.filter((c) => c !== clearKey(n, side, drop)));
     if (existing) {
       await db.sets.update(existing.id, fields);
       return;
@@ -79,56 +87,56 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       workoutId: workout.id,
       exerciseId,
       slotId: slot.id,
-      setNumber,
+      setNumber: n,
       side,
+      drop,
+      rir: null,
       timestamp: Date.now(),
       ...fields,
     });
-    // Start the rest timer once all sides of this set are done
-    const doneSides = new Set(mine.filter((s) => s.setNumber === setNumber).map((s) => s.side));
-    doneSides.add(side);
-    if (sides.every((s) => doneSides.has(s))) onSetDone(slot);
+    // Start the rest timer once all sides of this row are done
+    const done = new Set(mine.filter((s) => s.setNumber === n && s.drop === drop).map((s) => s.side));
+    done.add(side);
+    if (sides.every((s) => done.has(s))) onSetDone(slot);
   };
 
-  // Reset: the entry is deleted, the row stays and is prefilled again.
-  const reset = async (setNumber: number, side: Side) => {
-    const existing = mine.find((s) => s.setNumber === setNumber && s.side === side);
-    if (existing) await db.sets.delete(existing.id);
+  // Reset: the entries of this set are deleted and the fields stay empty
+  const resetSet = async (n: number) => {
+    await db.sets.bulkDelete(mine.filter((s) => s.setNumber === n).map((s) => s.id));
+    setCleared([
+      ...cleared,
+      ...sides.flatMap((side) => [clearKey(n, side, false), clearKey(n, side, true)]),
+    ]);
   };
 
-  // Remove row: only for sets added with "+ Satz" – entry and row disappear.
-  const removeRow = async (setNumber: number) => {
-    await db.sets.bulkDelete(mine.filter((s) => s.setNumber === setNumber).map((s) => s.id));
-    const extra = Math.max(0, (workout.extraSets[extraKey] ?? 0) - 1);
-    await db.workouts.update(workout.id, { extraSets: { ...workout.extraSets, [extraKey]: extra } });
+  // Delete: the row disappears, later sets move up one number
+  const deleteSet = async (n: number) => {
+    await db.transaction('rw', db.sets, db.workouts, async () => {
+      await db.sets.bulkDelete(mine.filter((s) => s.setNumber === n).map((s) => s.id));
+      for (const s of mine.filter((s) => s.setNumber > n)) {
+        await db.sets.update(s.id, { setNumber: s.setNumber - 1 });
+      }
+      await db.workouts.update(workout.id, {
+        setCounts: { ...workout.setCounts, [key]: Math.max(1, rowCount - 1) },
+      });
+    });
+    setOpenDrops(openDrops.filter((d) => d !== n));
   };
+
+  const addSet = () => db.workouts.update(workout.id, { setCounts: { ...workout.setCounts, [key]: rowCount + 1 } });
 
   const choose = (id: number) => db.workouts.update(workout.id, { choices: { ...workout.choices, [slot.id]: id } });
 
-  const addSet = () =>
-    db.workouts.update(workout.id, {
-      extraSets: { ...workout.extraSets, [extraKey]: rowCount - targets.sets + 1 },
-    });
-
   // Today's hint: all planned sets done and at the top of the range
-  const doneNow = sides.every((side) =>
-    reachedTop(
-      mine.filter((s) => s.side === side),
-      ex,
-      targets,
-    ),
-  );
+  const doneNow = sides.every((side) => reachedTop(mine.filter((s) => s.side === side && !s.drop), ex, targets));
   const progressSides = sides.filter((s) => progressed.get(s));
-
   const options = [slot.exerciseId, ...slot.alternativeIds];
 
   return (
     <section className="slot">
       <div className="slot-head">
         <span className="slot-pos">{slot.position}</span>
-        <span className="label grow flush">
-          {slot.name}
-        </span>
+        <span className="label grow flush">{slot.name}</span>
         <button className="icon-btn" aria-label="Nach oben" disabled={!canMoveUp} onClick={() => onMove(-1)}>
           ↑
         </button>
@@ -168,9 +176,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       )}
       {doneNow && <div className="hint">✓ Oberes Ende erreicht – nächstes Mal +{fmtNum(WEIGHT_STEP)} kg</div>}
       {otherExercises.length > 0 && (
-        <p className="small muted">
-          Auch erfasst: {otherExercises.map((id) => exercises.get(id)?.name).join(', ')}
-        </p>
+        <p className="small muted">Auch erfasst: {otherExercises.map((id) => exercises.get(id)?.name).join(', ')}</p>
       )}
 
       <div className="sets">
@@ -187,31 +193,64 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
           )}
           <span />
         </div>
-        {Array.from({ length: rowCount }, (_, i) => i + 1).map((n) =>
-          sides.map((side) => (
-            <div key={`${exerciseId}-${n}-${side}`}>
-              <SetRow
-                setNumber={n}
-                side={side}
-                type={ex.type}
-                saved={mine.find((s) => s.setNumber === n && s.side === side)}
-                prefill={prefillFor(n, side)}
-                showDetails={showDetails}
-                extraRow={n > targets.sets}
-                onSave={(v) => save(n, side, v)}
-                onReset={() => reset(n, side)}
-                onRemoveRow={() => removeRow(n)}
-              />
-              <div className="last">{lastText(n, side)}</div>
+
+        {Array.from({ length: rowCount }, (_, i) => i + 1).map((n) => {
+          const hasDrop = mine.some((s) => s.setNumber === n && s.drop) || openDrops.includes(n);
+          return (
+            <div key={`${exerciseId}-${n}`}>
+              {sides.map((side) => (
+                <div key={side}>
+                  <SetRow
+                    label={`${n}${side !== 'both' ? ` ${SIDE_LABEL[side]}` : ''}`}
+                    ariaLabel={`Satz ${n} ${SIDE_LABEL[side]}`}
+                    type={ex.type}
+                    saved={savedSet(n, side, false)}
+                    prefill={prefillFor(n, side, false)}
+                    onSave={(v) => save(n, side, false, v)}
+                  />
+                  <div className="last">{lastText(n, side)}</div>
+                </div>
+              ))}
+
+              {hasDrop &&
+                sides.map((side) => (
+                  <div key={`drop-${side}`}>
+                    <SetRow
+                      label={`↓${side !== 'both' ? ` ${SIDE_LABEL[side]}` : ''}`}
+                      ariaLabel={`Dropsatz zu Satz ${n} ${SIDE_LABEL[side]}`}
+                      type={ex.type}
+                      saved={savedSet(n, side, true)}
+                      prefill={{ weight: null, value: null }}
+                      onSave={(v) => save(n, side, true, v)}
+                    />
+                    <div className="last">Zusatz mit reduziertem Gewicht</div>
+                  </div>
+                ))}
+
+              {showDetails && (
+                <div className="set-extra">
+                  {!hasDrop && (
+                    <button className="toggle-btn" onClick={() => setOpenDrops([...openDrops, n])}>
+                      + Dropsatz
+                    </button>
+                  )}
+                  <button className="toggle-btn" onClick={() => resetSet(n)}>
+                    Satz {n} zurücksetzen
+                  </button>
+                  <button className="toggle-btn" disabled={rowCount === 1} onClick={() => deleteSet(n)}>
+                    Satz {n} löschen
+                  </button>
+                </div>
+              )}
             </div>
-          )),
-        )}
+          );
+        })}
       </div>
 
       {showDetails && (
         <p className="small muted">
-          Dropsatz: Satz, bei dem du sofort Gewicht reduzierst und weitermachst. Markierte Dropsätze zählen in der
-          Statistik nicht als eigener harter Satz. Zurücksetzen leert einen falsch eingetragenen Satz.
+          Dropsatz: nach dem normalen Satz das Gewicht reduzieren und noch so viele Wiederholungen wie möglich
+          anhängen — die Zeile mit ↓ ist dieser Zusatz. Zurücksetzen leert die Felder eines Satzes.
         </p>
       )}
 
@@ -219,10 +258,15 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
         <button className="btn secondary grow" onClick={addSet}>
           + Satz
         </button>
-        <button className={`btn secondary${showDetails ? ' on' : ''}`} onClick={() => setShowDetails(!showDetails)}>
-          {showDetails ? 'Fertig' : 'Satz bearbeiten'}
+        <button className="btn secondary" onClick={() => setShowDetails(!showDetails)}>
+          {showDetails ? 'Fertig' : 'Übung bearbeiten'}
         </button>
       </div>
+      {showDetails && (
+        <button className="btn danger block section-sm" onClick={onSkip}>
+          Übung heute streichen
+        </button>
+      )}
     </section>
   );
 }

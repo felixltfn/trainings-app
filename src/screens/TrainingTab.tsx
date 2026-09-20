@@ -81,7 +81,7 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
             </button>
           ))}
         </div>
-        {templates.length === 0 && <p className="muted">Keine Trainingstage. Lege unter „Plan“ einen an.</p>}
+        {templates.length === 0 && <p className="muted">Keine Trainingstage. Lege unter „Einstellungen“ einen an.</p>}
       </div>
     </div>
   );

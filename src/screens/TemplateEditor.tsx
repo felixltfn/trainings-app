@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
 import { db, type Slot } from '../db';
-import { fmtTarget, slotTargets } from '../logic';
+import { slotTargets } from '../logic';
 import { SlotEditor } from './SlotEditor';
 
 interface Props {
@@ -116,9 +116,8 @@ export function TemplateEditor({ templateId, onClose }: Props) {
                       <b>{slot.name}</b>
                       <br />
                       <span className="small muted">
-                        {ex?.name} · {t.sets} × {ex ? fmtTarget(t, ex.type) : ''}
-                        {slot.orderFixed ? ' · fest' : ''}
-                        {slot.supersetGroup ? ` · SS ${slot.supersetGroup}` : ''}
+                        {ex?.name} · {t.sets} Sätze
+                        {slot.supersetGroup ? ` · Supersatz ${slot.supersetGroup}` : ''}
                       </span>
                     </span>
                   </button>

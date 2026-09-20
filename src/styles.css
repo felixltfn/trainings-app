@@ -870,3 +870,9 @@ button.banner {
     animation: none;
   }
 }
+
+/* "Einstellungen" is the longest tab label – it may shrink instead of wrapping */
+.tabbar button {
+  font-size: clamp(9px, 2.6vw, 11px);
+  white-space: nowrap;
+}
