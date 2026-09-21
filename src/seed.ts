@@ -363,33 +363,42 @@ export async function seedStretchesIfEmpty(): Promise<void> {
   await db.stretches.bulkAdd(STRETCHES.map((s, i) => ({ ...s, position: i + 1 })));
 }
 
-// One-off correction for stretching plans created before this change: the deep squat
-// now sits between the two cossack squat sets instead of a 75 second pause.
+// One-off correction: the cossack squat is two separate entries with the deep squat
+// between them, instead of one entry with two sets and a 75 second pause.
+// Written so it produces that state no matter what the plan looks like right now.
 export async function applyStretchFixes(): Promise<void> {
-  if (await db.meta.get('stretchFix1')) return;
+  if (await db.meta.get('stretchFix2')) return;
 
   await db.transaction('rw', [db.stretches, db.meta], async () => {
     const plan = await db.stretches.orderBy('position').toArray();
-    const cossack = plan[0];
-    const squat = plan[1];
-    const untouched =
-      cossack?.name === 'Cossack Squat' && cossack.rounds === 2 && squat?.name === 'Tiefe Hocke';
+    const cossacks = plan.filter((s) => s.name.startsWith('Cossack'));
+    const squat = plan.find((s) => s.name === 'Tiefe Hocke');
 
-    if (untouched) {
-      await db.stretches.update(cossack.id, { rounds: 1, restSeconds: null });
-      // Everything after the deep squat moves one position down
-      for (const s of plan.slice(2)) await db.stretches.update(s.id, { position: s.position + 1 });
-      await db.stretches.add({
-        position: squat.position + 1,
-        name: 'Cossack Squat',
-        rounds: 1,
-        perSide: false,
-        seconds: null,
-        restSeconds: null,
-        note: 'Zweiter Durchgang. Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. 6 Wiederholungen je Seite.',
-      });
+    if (cossacks.length >= 1 && squat) {
+      // Every cossack entry is a single round without its own pause
+      for (const c of cossacks) await db.stretches.update(c.id, { rounds: 1, restSeconds: null, seconds: null });
+
+      // Add the second one if the plan only has one
+      let secondId = cossacks[1]?.id;
+      if (secondId === undefined) {
+        secondId = await db.stretches.add({
+          position: 0,
+          name: 'Cossack Squat',
+          rounds: 1,
+          perSide: false,
+          seconds: null,
+          restSeconds: null,
+          note: 'Zweiter Durchgang. Seitlicher Ausfallschritt, gestrecktes Bein auf der Ferse. 6 Wiederholungen je Seite.',
+        });
+      }
+
+      // Order: cossack, deep squat, cossack, then everything else as before
+      const firstId = cossacks[0].id;
+      const rest = plan.filter((s) => s.id !== firstId && s.id !== squat.id && s.id !== secondId);
+      const ordered = [firstId, squat.id, secondId, ...rest.map((s) => s.id)];
+      for (const [i, id] of ordered.entries()) await db.stretches.update(id, { position: i + 1 });
     }
 
-    await db.meta.put({ key: 'stretchFix1', value: Date.now() });
+    await db.meta.put({ key: 'stretchFix2', value: Date.now() });
   });
 }
