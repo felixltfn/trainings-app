@@ -134,7 +134,7 @@ const TEMPLATES: { name: string; short: string; slots: SeedSlot[] }[] = [
     name: 'Upper B',
     short: 'B',
     slots: [
-      { name: 'Brust horizontal', ex: 'Liegestütze', alt: ['Brustpresse', 'Bankdrücken'], sets: 3, reps: [6, 10], rir: '1', rest: [120, 180], fixed: true, over: { Bankdrücken: { rir: '1–2' } } },
+      { name: 'Brust horizontal', ex: 'Liegestütze', alt: ['Brustpresse', 'Bankdrücken'], sets: 3, reps: [6, 10], rir: '1', rest: [120, 180], fixed: true, over: { Liegestütze: { repMin: 10, repMax: 20 }, Bankdrücken: { rir: '1–2' } } },
       { name: 'Vertikalzug', ex: 'Klimmzüge Neutralgriff', alt: ['Latzug'], sets: 3, reps: [5, 10], rir: '1', rest: [120, 180], fixed: true },
       { name: 'Schulterdrücken', ex: 'Schulterdrücken Kurzhantel', alt: ['Schulterdrücken Maschine'], sets: 3, reps: [6, 10], rir: '1–2', rest: [120, 180], fixed: true },
       { name: 'Lat Isolation', ex: 'Überzüge am Kabel', sets: 3, reps: [10, 15], rir: '0–1', rest: [120, 120] },
@@ -198,6 +198,7 @@ export async function seedIfEmpty(): Promise<void> {
 export async function applyPlanFixes(): Promise<void> {
   await applyPlanFixes1();
   await applyPlanFixes2();
+  await applyPlanFixes3();
 }
 
 async function applyPlanFixes1(): Promise<void> {
@@ -281,6 +282,24 @@ async function applyPlanFixes2(): Promise<void> {
     }
 
     await db.meta.put({ key: 'planFixes2', value: Date.now() });
+  });
+}
+
+// Push-ups get their own rep range (10–20); the presses in the same slot keep 6–10.
+// Skips slots where a push-up override already exists (your own setting wins).
+async function applyPlanFixes3(): Promise<void> {
+  if (await db.meta.get('planFixes3')) return;
+
+  await db.transaction('rw', [db.exercises, db.slots, db.meta], async () => {
+    const pushUp = (await db.exercises.toArray()).find((e) => e.name === 'Liegestütze');
+    if (pushUp) {
+      for (const slot of await db.slots.toArray()) {
+        const uses = slot.exerciseId === pushUp.id || slot.alternativeIds.includes(pushUp.id);
+        if (!uses || slot.overrides[pushUp.id]) continue;
+        await db.slots.update(slot.id, { overrides: { ...slot.overrides, [pushUp.id]: { repMin: 10, repMax: 20 } } });
+      }
+    }
+    await db.meta.put({ key: 'planFixes3', value: Date.now() });
   });
 }
 
