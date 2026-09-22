@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { fmtClock } from './logic';
+import { beep } from './signal';
 import type { TimerState } from './timer';
+
+const WARN_AT = 10; // seconds before the end of the pause
 
 interface Props {
   timer: TimerState;
@@ -26,6 +29,13 @@ export function RestTimer({ timer, onChange }: Props) {
   const remaining = timer.min - elapsed;
   const done = remaining <= 0;
   const toMax = timer.max - elapsed;
+
+  // One beep when the countdown passes the 10 s mark (also after ±15, but not on a jump into it from below)
+  const lastRemaining = useRef(remaining);
+  useEffect(() => {
+    if (lastRemaining.current > WARN_AT && remaining <= WARN_AT && remaining > 0) beep();
+    lastRemaining.current = remaining;
+  }, [remaining]);
 
   return (
     <div className={`timer${done ? ' done' : ''}`} role="timer">

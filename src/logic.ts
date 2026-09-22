@@ -146,6 +146,27 @@ export function sidesOf(ex: Exercise): WorkoutSet['side'][] {
   return ex.unilateral ? ['left', 'right'] : ['both'];
 }
 
+// Number of set rows shown for this slot today (planned, added, or already logged)
+export function slotRowCount(slot: Slot, workout: Workout, exerciseId: number, logged: WorkoutSet[]): number {
+  const planned = workout.setCounts[`${slot.id}:${exerciseId}`] ?? slotTargets(slot, exerciseId).sets;
+  return Math.max(planned, ...logged.map((s) => s.setNumber), 1);
+}
+
+// True when every row of the slot has a working set on every side
+export function slotComplete(slot: Slot, workout: Workout, ex: Exercise, sets: WorkoutSet[]): boolean {
+  const mine = sets.filter((s) => s.slotId === slot.id && s.exerciseId === ex.id && !s.drop);
+  const rows = slotRowCount(slot, workout, ex.id, mine);
+  for (let n = 1; n <= rows; n++) {
+    for (const side of sidesOf(ex)) {
+      if (!mine.some((s) => s.setNumber === n && s.side === side)) return false;
+    }
+  }
+  return true;
+}
+
+// Pause after the last set of an exercise, no matter how long the pause between its sets is
+export const EXERCISE_CHANGE_REST = 60;
+
 export const SIDE_LABEL: Record<WorkoutSet['side'], string> = { both: '', left: 'L', right: 'R' };
 
 // Training time = from the first to the last logged set. Only if that is not

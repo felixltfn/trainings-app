@@ -26,7 +26,7 @@ export function DayView({ date, onClose }: Props) {
   if (editId !== null) {
     return (
       <div className="sheet">
-        <WorkoutScreen workoutId={editId} mode="edit" onSetDone={() => {}} onClose={() => setEditId(null)} />
+        <WorkoutScreen workoutId={editId} mode="edit" onRest={() => {}} onClose={() => setEditId(null)} />
       </div>
     );
   }

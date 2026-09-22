@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
 import { startWorkout, suggestNextTemplateId } from '../data';
-import { db, getActivePlanVersionId, type Slot } from '../db';
+import { db, getActivePlanVersionId } from '../db';
 import type { TimerState } from '../timer';
 import { WorkoutScreen } from './WorkoutScreen';
 
@@ -29,14 +29,12 @@ export function TrainingTab({ onSetDone, onFinished }: Props) {
   if (running === undefined || !home) return <div className="screen" />;
 
   if (running && !showList) {
-    const startTimer = (slot: Slot) => {
-      if (slot.restMin > 0) onSetDone({ startedAt: Date.now(), min: slot.restMin, max: slot.restMax });
-    };
+    const startTimer = (min: number, max: number) => onSetDone({ startedAt: Date.now(), min, max });
     return (
       <WorkoutScreen
         workoutId={running.id}
         mode="live"
-        onSetDone={startTimer}
+        onRest={startTimer}
         onClose={(finishedDate) => {
           setShowList(true);
           if (finishedDate) onFinished();

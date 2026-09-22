@@ -75,6 +75,7 @@ const EXERCISES: SeedExercise[] = [
   ex('Plank', 'Bauch', [], { bodyweight: true, type: 'time' }),
   ex('Plank mit Gewichtsweste', 'Bauch', [], { type: 'time' }),
   ex('Bankdrücken', 'Brust', ['Trizeps', 'Vordere Schulter']),
+  ex('Liegestütze', 'Brust', ['Trizeps', 'Vordere Schulter'], { bodyweight: true }),
   ex('Klimmzüge Neutralgriff', 'Lat', ['Oberer Rücken', 'Bizeps'], { bodyweight: true }),
   ex('Schulterdrücken Kurzhantel', 'Vordere Schulter', ['Seitliche Schulter', 'Trizeps']),
   ex('Schulterdrücken Maschine', 'Vordere Schulter', ['Seitliche Schulter', 'Trizeps']),
@@ -133,7 +134,7 @@ const TEMPLATES: { name: string; short: string; slots: SeedSlot[] }[] = [
     name: 'Upper B',
     short: 'B',
     slots: [
-      { name: 'Brust horizontal', ex: 'Brustpresse', alt: ['Bankdrücken'], sets: 3, reps: [6, 10], rir: '1', rest: [120, 180], fixed: true, over: { Bankdrücken: { rir: '1–2' } } },
+      { name: 'Brust horizontal', ex: 'Liegestütze', alt: ['Brustpresse', 'Bankdrücken'], sets: 3, reps: [6, 10], rir: '1', rest: [120, 180], fixed: true, over: { Bankdrücken: { rir: '1–2' } } },
       { name: 'Vertikalzug', ex: 'Klimmzüge Neutralgriff', alt: ['Latzug'], sets: 3, reps: [5, 10], rir: '1', rest: [120, 180], fixed: true },
       { name: 'Schulterdrücken', ex: 'Schulterdrücken Kurzhantel', alt: ['Schulterdrücken Maschine'], sets: 3, reps: [6, 10], rir: '1–2', rest: [120, 180], fixed: true },
       { name: 'Lat Isolation', ex: 'Überzüge am Kabel', sets: 3, reps: [10, 15], rir: '0–1', rest: [120, 120] },
@@ -195,6 +196,11 @@ export async function seedIfEmpty(): Promise<void> {
 // ---------- One-off corrections for databases created before these plan changes ----------
 // Runs once (guarded by a flag in `meta`), so later edits of your own are never overwritten.
 export async function applyPlanFixes(): Promise<void> {
+  await applyPlanFixes1();
+  await applyPlanFixes2();
+}
+
+async function applyPlanFixes1(): Promise<void> {
   if (await db.meta.get('planFixes1')) return;
 
   await db.transaction('rw', [db.exercises, db.slots, db.sets, db.meta], async () => {
@@ -244,6 +250,37 @@ export async function applyPlanFixes(): Promise<void> {
     }
 
     await db.meta.put({ key: 'planFixes1', value: Date.now() });
+  });
+}
+
+// Upper B: push-ups become the main chest exercise, the chest press an alternative.
+// Only touches slots that still have the chest press as their main exercise.
+async function applyPlanFixes2(): Promise<void> {
+  if (await db.meta.get('planFixes2')) return;
+
+  await db.transaction('rw', [db.exercises, db.templates, db.slots, db.meta], async () => {
+    const all = await db.exercises.toArray();
+    const press = all.find((e) => e.name === 'Brustpresse');
+    const pushUpId =
+      all.find((e) => e.name === 'Liegestütze')?.id ??
+      (await db.exercises.add({
+        name: 'Liegestütze',
+        primaryMuscle: 'Brust',
+        secondaryMuscles: ['Trizeps', 'Vordere Schulter'],
+        unilateral: false,
+        bodyweight: true,
+        type: 'reps',
+        note: '',
+      }));
+
+    const upperB = (await db.templates.toArray()).filter((t) => t.name === 'Upper B').map((t) => t.id);
+    for (const slot of await db.slots.toArray()) {
+      if (!press || !upperB.includes(slot.templateId) || slot.exerciseId !== press.id) continue;
+      const alternativeIds = [press.id, ...slot.alternativeIds.filter((id) => id !== press.id && id !== pushUpId)];
+      await db.slots.update(slot.id, { exerciseId: pushUpId, alternativeIds });
+    }
+
+    await db.meta.put({ key: 'planFixes2', value: Date.now() });
   });
 }
 

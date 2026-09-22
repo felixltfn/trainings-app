@@ -3,7 +3,19 @@ import { useState } from 'react';
 
 import { previousSession } from '../data';
 import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet } from '../db';
-import { SIDE_LABEL, WEIGHT_STEP, fmtClock, fmtNum, fmtRest, reachedTop, sidesOf, slotTargets } from '../logic';
+import {
+  EXERCISE_CHANGE_REST,
+  SIDE_LABEL,
+  WEIGHT_STEP,
+  fmtClock,
+  fmtNum,
+  fmtRest,
+  reachedTop,
+  sidesOf,
+  slotComplete,
+  slotRowCount,
+  slotTargets,
+} from '../logic';
 import { Picker } from '../Picker';
 import { SetRow, type Prefill, type SetValues } from './SetRow';
 
@@ -13,14 +25,15 @@ interface Props {
   exercises: Map<number, Exercise>;
   sets: WorkoutSet[]; // all sets of this workout
   partner: string | null; // superset partner label
+  partnerSlots: Slot[]; // the other slots of this superset (empty if none)
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (dir: -1 | 1) => void;
-  onSetDone: (slot: Slot) => void;
+  onRest: (min: number, max: number) => void; // seconds
   onSkip: () => void;
 }
 
-export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, canMoveDown, onMove, onSetDone, onSkip }: Props) {
+export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots, canMoveUp, canMoveDown, onMove, onRest, onSkip }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   // Set numbers with a drop set row that isn't saved yet
   const [openDrops, setOpenDrops] = useState<number[]>([]);
@@ -37,7 +50,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
   const sides = sidesOf(ex);
   const mine = sets.filter((s) => s.slotId === slot.id && s.exerciseId === exerciseId);
   const key = `${slot.id}:${exerciseId}`;
-  const rowCount = Math.max(workout.setCounts[key] ?? targets.sets, ...mine.map((s) => s.setNumber), 1);
+  const rowCount = slotRowCount(slot, workout, exerciseId, mine);
   // Sets done with another exercise of this slot (after switching) stay visible as a hint
   const otherExercises = [...new Set(sets.filter((s) => s.slotId === slot.id && s.exerciseId !== exerciseId).map((s) => s.exerciseId))];
 
@@ -56,12 +69,12 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
     const list = prevBySide(side);
     const p = list.find((s) => s.setNumber === n) ?? list[list.length - 1];
     if (!p) return { weight: ex.bodyweight ? 0 : null, value: null };
-    const value = ex.type === 'time' ? p.duration : p.reps;
+    // Only the weight is carried over – reps are entered fresh every time
     if (progressed.get(side)) {
       const maxWeight = Math.max(...list.map((s) => s.weight));
-      return { weight: maxWeight + WEIGHT_STEP, value: targets.repMin || value };
+      return { weight: maxWeight + WEIGHT_STEP, value: null };
     }
-    return { weight: p.weight, value };
+    return { weight: p.weight, value: null };
   };
 
   const lastText = (n: number, side: Side): string => {
@@ -84,7 +97,7 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       await db.sets.update(existing.id, fields);
       return;
     }
-    await db.sets.add({
+    const record: Omit<WorkoutSet, 'id'> = {
       workoutId: workout.id,
       exerciseId,
       slotId: slot.id,
@@ -94,11 +107,20 @@ export function SlotCard({ slot, workout, exercises, sets, partner, canMoveUp, c
       rir: null,
       timestamp: Date.now(),
       ...fields,
-    });
+    };
+    const id = await db.sets.add(record);
     // Start the rest timer once all sides of this row are done
     const done = new Set(mine.filter((s) => s.setNumber === n && s.drop === drop).map((s) => s.side));
     done.add(side);
-    if (sides.every((s) => done.has(s))) onSetDone(slot);
+    if (!sides.every((s) => done.has(s)) || slot.restMin <= 0) return;
+    // Last set of the exercise (and of its superset partners): fixed change-over pause
+    const after = [...sets, { ...record, id }];
+    const exerciseDone = [slot, ...partnerSlots].every((s) => {
+      const e = exercises.get(workout.choices[s.id] ?? s.exerciseId);
+      return !e || slotComplete(s, workout, e, after);
+    });
+    if (exerciseDone) onRest(EXERCISE_CHANGE_REST, EXERCISE_CHANGE_REST);
+    else onRest(slot.restMin, slot.restMax);
   };
 
   // Reset: the entries of this set are deleted and the fields stay empty

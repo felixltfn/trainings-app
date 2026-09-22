@@ -1,6 +1,7 @@
 import type { Stretch } from './db';
 
-export const CHANGE_REST = 5; // standard pause between two rounds
+export const CHANGE_REST = 5; // standard pause between two rounds (or sides) of one exercise
+export const EXERCISE_REST = 10; // pause before the next exercise
 
 export interface Step {
   kind: 'exercise' | 'rest';
@@ -40,8 +41,8 @@ export function buildSteps(stretches: Stretch[]): Step[] {
           rounds: Math.max(1, s.rounds),
           perSide: s.perSide,
           // The exercise's own pause applies between its rounds; after the last
-          // round the standard change-over pause leads into the next exercise.
-          seconds: lastRound ? CHANGE_REST : (s.restSeconds ?? CHANGE_REST),
+          // round a longer pause leads into the next exercise.
+          seconds: lastRound ? EXERCISE_REST : (s.restSeconds ?? CHANGE_REST),
           note: '',
           exerciseIndex,
         });

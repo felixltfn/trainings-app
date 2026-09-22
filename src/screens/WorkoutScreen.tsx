@@ -9,11 +9,11 @@ import { SlotCard } from './SlotCard';
 interface Props {
   workoutId: number;
   mode: 'live' | 'edit'; // edit = a finished workout opened from the calendar
-  onSetDone: (slot: Slot) => void;
+  onRest: (min: number, max: number) => void; // seconds
   onClose: (finishedDate: string | null) => void;
 }
 
-export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
+export function WorkoutScreen({ workoutId, mode, onRest, onClose }: Props) {
   const workout = useLiveQuery(() => db.workouts.get(workoutId), [workoutId]);
   const template = useLiveQuery(async () => (workout ? db.templates.get(workout.templateId) : undefined), [workout?.templateId]);
   const slots = useLiveQuery(
@@ -55,9 +55,13 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
     db.workouts.update(workout.id, { slotOrder: order });
   };
 
+  const partnerSlotsOf = (slot: Slot): Slot[] =>
+    slot.supersetGroup
+      ? slots.filter((s) => s.id !== slot.id && s.supersetGroup === slot.supersetGroup && !skipped.includes(s.id))
+      : [];
+
   const partnerOf = (slot: Slot): string | null => {
-    if (!slot.supersetGroup) return null;
-    const others = slots.filter((s) => s.id !== slot.id && s.supersetGroup === slot.supersetGroup);
+    const others = partnerSlotsOf(slot);
     if (others.length === 0) return null;
     return others
       .map((o) => `${o.position}. ${exercises.get(workout.choices[o.id] ?? o.exerciseId)?.name ?? o.name}`)
@@ -130,10 +134,11 @@ export function WorkoutScreen({ workoutId, mode, onSetDone, onClose }: Props) {
             exercises={exercises}
             sets={sets}
             partner={partnerOf(slot)}
+            partnerSlots={partnerSlotsOf(slot)}
             canMoveUp={neighbour(i, -1) >= 0}
             canMoveDown={neighbour(i, 1) >= 0}
             onMove={(dir) => move(i, dir)}
-            onSetDone={onSetDone}
+            onRest={onRest}
             onSkip={() => skip(slot)}
           />
         ))}

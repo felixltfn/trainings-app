@@ -1,43 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { db } from '../db';
 import { fmtClock, fmtDuration, isoDate } from '../logic';
+import { beep, unlockAudio } from '../signal';
 import { buildSteps, catchUp, elapsedSeconds, loadRun, roundLabel, saveRun, type RunState } from '../stretchRun';
 
 interface Props {
   onClose: () => void;
-}
-
-// Short beep at the end of a timer. Created on the first tap, because iOS only
-// allows audio after a user gesture.
-function useSignal() {
-  const ctx = useRef<AudioContext | null>(null);
-
-  const unlock = () => {
-    if (!ctx.current) {
-      const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctor) ctx.current = new Ctor();
-    }
-    ctx.current?.resume().catch(() => {});
-  };
-
-  const beep = () => {
-    navigator.vibrate?.(200);
-    const audio = ctx.current;
-    if (!audio) return;
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.001, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.35);
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + 0.36);
-  };
-
-  return { unlock, beep };
 }
 
 // Keeps the screen awake while the routine runs (Safari supports this since 16.4).
@@ -69,7 +39,6 @@ export function StretchScreen({ onClose }: Props) {
   const [run, setRun] = useState<RunState | null>(loadRun);
   const [done, setDone] = useState<{ seconds: number } | null>(null);
   const [now, setNow] = useState(Date.now());
-  const { unlock, beep } = useSignal();
 
   useWakeLock(run !== null && run.pausedAt === null);
 
@@ -145,7 +114,7 @@ export function StretchScreen({ onClose }: Props) {
         <button
           className="btn block section"
           onClick={() => {
-            unlock();
+            unlockAudio();
             const started: RunState = { startedAt: Date.now(), index: 0, stepStartedAt: Date.now(), pausedAt: null };
             setRun(started);
             saveRun(started);
