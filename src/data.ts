@@ -12,7 +12,7 @@ export async function startWorkout(templateId: number): Promise<number> {
     end: null,
     templateId,
     note: '',
-    bodyweight: await latestBodyweight(),
+    bodyweight: null, // only filled in when actually weighed
     slotOrder: slots.map((s) => s.id),
     choices: Object.fromEntries(slots.map((s) => [s.id, s.exerciseId])),
     setCounts: {},
@@ -25,11 +25,6 @@ export async function deleteWorkout(id: number): Promise<void> {
     await db.sets.where('workoutId').equals(id).delete();
     await db.workouts.delete(id);
   });
-}
-
-async function latestBodyweight(): Promise<number | null> {
-  const all = await db.workouts.orderBy('start').reverse().toArray();
-  return all.find((w) => w.bodyweight !== null)?.bodyweight ?? null;
 }
 
 // Bodyweight for a workout; if it wasn't entered, the most recent earlier value is used.
