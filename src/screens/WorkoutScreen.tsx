@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 
-import { deleteWorkout } from '../data';
+import { deleteWorkout, loadProgression } from '../data';
 import { db, type Slot } from '../db';
 import { fmtDuration, fmtNum, parseNum } from '../logic';
+import { DELOAD_RIR, isDeloadWeek } from '../progression';
 import { SlotCard } from './SlotCard';
 
 interface Props {
@@ -22,6 +23,8 @@ export function WorkoutScreen({ workoutId, mode, onRest, onClose }: Props) {
   );
   const exercises = useLiveQuery(async () => new Map((await db.exercises.toArray()).map((e) => [e.id, e])), []);
   const sets = useLiveQuery(() => db.sets.where('workoutId').equals(workoutId).toArray(), [workoutId]);
+  const settings = useLiveQuery(loadProgression, []);
+  const plan = useLiveQuery(async () => (template ? db.planVersions.get(template.planVersionId) : undefined), [template?.planVersionId]);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -29,7 +32,9 @@ export function WorkoutScreen({ workoutId, mode, onRest, onClose }: Props) {
     return () => window.clearInterval(id);
   }, []);
 
-  if (!workout || !slots || !exercises || !sets) return <div className="screen" />;
+  if (!workout || !slots || !exercises || !sets || !settings) return <div className="screen" />;
+
+  const deload = !!plan && isDeloadWeek(plan.start, workout.date, settings.deloadEvery);
 
   // Session order: stored order first, slots added to the template later are appended.
   // Exercises skipped for today are left out.
@@ -101,6 +106,11 @@ export function WorkoutScreen({ workoutId, mode, onRest, onClose }: Props) {
         {stamps.length > 0 && ` · Trainingszeit ${fmtDuration(elapsed)}`}
       </p>
       <h1 className="title">{template?.name ?? 'Training'}</h1>
+      {deload && (
+        <p className="banner section-sm">
+          Deload-Woche: gleiches Gewicht wie zuletzt, halbe Sätze, RIR {DELOAD_RIR}.
+        </p>
+      )}
 
       <div className="pair section-sm">
         <label className="field">
@@ -135,6 +145,8 @@ export function WorkoutScreen({ workoutId, mode, onRest, onClose }: Props) {
             sets={sets}
             partner={partnerOf(slot)}
             partnerSlots={partnerSlotsOf(slot)}
+            settings={settings}
+            deload={deload}
             canMoveUp={neighbour(i, -1) >= 0}
             canMoveDown={neighbour(i, 1) >= 0}
             onMove={(dir) => move(i, dir)}

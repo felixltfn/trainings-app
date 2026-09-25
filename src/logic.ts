@@ -131,19 +131,11 @@ export function hardSetsPerMuscle(sets: WorkoutSet[], exercises: Map<number, Exe
   return result;
 }
 
-// ---------- Progression ----------
+// ---------- Sides and set rows ----------
 
-export const WEIGHT_STEP = 2.5;
-
-// True if every set of this side reached the top of the range and at least the planned number of sets was done.
-export function reachedTop(sets: WorkoutSet[], ex: Exercise, targets: Targets): boolean {
-  const work = sets.filter((s) => !s.drop);
-  if (work.length < targets.sets) return false;
-  return work.every((s) => (ex.type === 'time' ? (s.duration ?? 0) : (s.reps ?? 0)) >= targets.repMax);
-}
-
+// Unilateral exercises start with the right side
 export function sidesOf(ex: Exercise): WorkoutSet['side'][] {
-  return ex.unilateral ? ['left', 'right'] : ['both'];
+  return ex.unilateral ? ['right', 'left'] : ['both'];
 }
 
 // Number of set rows shown for this slot today (planned, added, or already logged)

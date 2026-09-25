@@ -13,6 +13,7 @@ export interface Exercise {
   bodyweight: boolean; // weight field = additional load, may be 0
   type: ExerciseType; // 'time' = seconds instead of reps
   note: string;
+  weightStep?: number; // smallest weight step of this machine in kg; missing = the default from the settings
 }
 
 export interface PlanVersion {

@@ -74,6 +74,7 @@ const EXERCISES: SeedExercise[] = [
   ex('Hanging Knee Raises', 'Bauch', [], { bodyweight: true }),
   ex('Plank', 'Bauch', [], { bodyweight: true, type: 'time' }),
   ex('Plank mit Gewichtsweste', 'Bauch', [], { type: 'time' }),
+  ex('Pallof Press am Kabel', 'Bauch', [], { unilateral: true, type: 'time' }),
   ex('Bankdrücken', 'Brust', ['Trizeps', 'Vordere Schulter']),
   ex('Liegestütze', 'Brust', ['Trizeps', 'Vordere Schulter'], { bodyweight: true }),
   ex('Klimmzüge Neutralgriff', 'Lat', ['Oberer Rücken', 'Bizeps'], { bodyweight: true }),
@@ -98,6 +99,11 @@ interface SeedSlot {
   ss?: string;
   over?: Record<string, SlotOverride>;
 }
+
+// Lower: anti-rotation replaces the static plank. Seconds per side; the plank stays as
+// the alternative with one set of up to 3 minutes.
+const PALLOF_SLOT = { name: 'Rumpf Anti-Rotation', rir: 'kurz vor Formverlust' };
+const PLANK_OVERRIDE: SlotOverride = { sets: 1, repMin: 0, repMax: 180 };
 
 const TEMPLATES: { name: string; short: string; slots: SeedSlot[] }[] = [
   {
@@ -127,7 +133,7 @@ const TEMPLATES: { name: string; short: string; slots: SeedSlot[] }[] = [
       { name: 'Adduktoren', ex: 'Adduktoren-Maschine', sets: 3, reps: [10, 15], rir: '0–1', rest: [90, 120], ss: '3' },
       { name: 'Abduktoren', ex: 'Abduktoren-Maschine', sets: 3, reps: [10, 20], rir: '0–1', rest: [90, 120], ss: '3' },
       { name: 'Bauch', ex: 'Cable Crunch', alt: ['Bauchrolle', 'Hanging Knee Raises'], sets: 3, reps: [8, 15], rir: '0–1', rest: [90, 90] },
-      { name: 'Rumpf statisch', ex: 'Plank', alt: ['Plank mit Gewichtsweste'], sets: 1, reps: [0, 180], rir: 'kurz vor Formverlust', rest: [0, 0], fixed: true, over: { 'Plank mit Gewichtsweste': { repMin: 20, repMax: 40 } } },
+      { name: PALLOF_SLOT.name, ex: 'Pallof Press am Kabel', alt: ['Plank'], sets: 3, reps: [30, 40], rir: PALLOF_SLOT.rir, rest: [60, 60], fixed: true, over: { Plank: PLANK_OVERRIDE } },
     ],
   },
   {
@@ -199,6 +205,7 @@ export async function applyPlanFixes(): Promise<void> {
   await applyPlanFixes1();
   await applyPlanFixes2();
   await applyPlanFixes3();
+  await applyPlanFixes4();
 }
 
 async function applyPlanFixes1(): Promise<void> {
@@ -300,6 +307,59 @@ async function applyPlanFixes3(): Promise<void> {
       }
     }
     await db.meta.put({ key: 'planFixes3', value: Date.now() });
+  });
+}
+
+// Lower (active plan): the plank slot becomes "Rumpf Anti-Rotation" with the Pallof press
+// as default and the plank as alternative. If the plank slot is gone, the new slot is appended.
+async function applyPlanFixes4(): Promise<void> {
+  if (await db.meta.get('planFixes4')) return;
+
+  await db.transaction('rw', [db.exercises, db.templates, db.slots, db.meta], async () => {
+    const all = await db.exercises.toArray();
+    const plank = all.find((e) => e.name === 'Plank');
+    const pallofId =
+      all.find((e) => e.name === 'Pallof Press am Kabel')?.id ??
+      (await db.exercises.add({
+        name: 'Pallof Press am Kabel',
+        primaryMuscle: 'Bauch',
+        secondaryMuscles: [],
+        unilateral: true,
+        bodyweight: false,
+        type: 'time',
+        note: '',
+      }));
+
+    const activeId = (await db.meta.get('activePlanVersionId'))?.value;
+    const lowers = (await db.templates.toArray()).filter((t) => t.name === 'Lower' && t.planVersionId === activeId);
+    for (const lower of lowers) {
+      const slots = await db.slots.where('templateId').equals(lower.id).sortBy('position');
+      if (slots.some((s) => s.exerciseId === pallofId)) continue;
+      const patch = {
+        name: PALLOF_SLOT.name,
+        exerciseId: pallofId,
+        alternativeIds: plank ? [plank.id] : [],
+        sets: 3,
+        repMin: 30,
+        repMax: 40,
+        rir: PALLOF_SLOT.rir,
+        restMin: 60,
+        restMax: 60,
+        orderFixed: true,
+        supersetGroup: null,
+        overrides: plank ? { [plank.id]: PLANK_OVERRIDE } : {},
+      } satisfies Partial<Slot>;
+      const old = slots.find((s) => plank && s.exerciseId === plank.id) ?? slots.find((s) => s.name === 'Rumpf statisch');
+      // Fixed at the end: everything after the old slot moves up one position
+      const others = slots.filter((s) => s.id !== old?.id);
+      for (const [i, s] of others.entries()) {
+        if (s.position !== i + 1) await db.slots.update(s.id, { position: i + 1 });
+      }
+      if (old) await db.slots.update(old.id, { ...patch, position: others.length + 1 });
+      else await db.slots.add({ ...patch, templateId: lower.id, position: others.length + 1 });
+    }
+
+    await db.meta.put({ key: 'planFixes4', value: Date.now() });
   });
 }
 

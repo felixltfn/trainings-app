@@ -1,5 +1,6 @@
-import { db, type Slot, type Workout, type WorkoutSet } from './db';
+import { db, getMeta, type Exercise, type Slot, type Workout, type WorkoutSet } from './db';
 import { isoDate } from './logic';
+import { DEFAULT_PROGRESSION, isDeloadWeek, sessionRows, type ProgressionSettings, type Session } from './progression';
 
 // ---------- Workouts ----------
 
@@ -37,20 +38,40 @@ export function bodyweightFor(w: Workout, allWorkouts: Workout[]): number | null
   return best?.bodyweight ?? null;
 }
 
-// The last earlier session of this exercise (any day, any slot) with its sets.
-export async function previousSession(
-  exerciseId: number,
+// All earlier sessions of this exercise (any day, any slot), newest first, each with its
+// sets and whether it fell into a deload week. Also the bodyweight valid for `current`.
+export async function exerciseHistory(
+  ex: Exercise,
   current: Workout,
-): Promise<{ workout: Workout; sets: WorkoutSet[] } | null> {
-  const sets = await db.sets.where('exerciseId').equals(exerciseId).toArray();
-  const workoutIds = [...new Set(sets.map((s) => s.workoutId))].filter((id) => id !== current.id);
-  const workouts = (await db.workouts.bulkGet(workoutIds)).filter(
-    (w): w is Workout => w !== undefined && w.start < current.start,
-  );
-  if (workouts.length === 0) return null;
-  const last = workouts.reduce((a, b) => (b.start > a.start ? b : a));
-  const lastSets = sets.filter((s) => s.workoutId === last.id).sort((a, b) => a.setNumber - b.setNumber);
-  return { workout: last, sets: lastSets };
+  settings: ProgressionSettings,
+): Promise<{ sessions: (Session & { sets: WorkoutSet[] })[]; bodyweight: number | null }> {
+  const [sets, workouts, templates, plans] = await Promise.all([
+    db.sets.where('exerciseId').equals(ex.id).toArray(),
+    db.workouts.toArray(),
+    db.templates.toArray(),
+    db.planVersions.toArray(),
+  ]);
+  const planStart = new Map(templates.map((t) => [t.id, plans.find((p) => p.id === t.planVersionId)?.start]));
+  const ids = new Set(sets.map((s) => s.workoutId));
+  const earlier = workouts
+    .filter((w) => ids.has(w.id) && w.id !== current.id && w.start < current.start)
+    .sort((a, b) => b.start - a.start);
+  const sessions = earlier.map((workout) => {
+    const mine = sets.filter((s) => s.workoutId === workout.id).sort((a, b) => a.setNumber - b.setNumber);
+    const start = planStart.get(workout.templateId);
+    return {
+      workout,
+      sets: mine,
+      rows: sessionRows(mine, ex),
+      deload: !!start && isDeloadWeek(start, workout.date, settings.deloadEvery),
+    };
+  });
+  return { sessions, bodyweight: bodyweightFor(current, workouts) };
+}
+
+// Progression settings, with defaults for values that were never changed
+export async function loadProgression(): Promise<ProgressionSettings> {
+  return { ...DEFAULT_PROGRESSION, ...(await getMeta<Partial<ProgressionSettings>>('progression')) };
 }
 
 // Suggests the template after the one trained last (in plan order).

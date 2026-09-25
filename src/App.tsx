@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { RestTimer } from './RestTimer';
 import { CalendarScreen } from './screens/CalendarScreen';
@@ -7,7 +7,8 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { StatsScreen } from './screens/StatsScreen';
 import { StretchScreen } from './screens/StretchScreen';
 import { TrainingTab } from './screens/TrainingTab';
-import { loadTimer, saveTimer, type TimerState } from './timer';
+import { scheduleCues } from './signal';
+import { loadTimer, saveTimer, timerCues, type TimerState } from './timer';
 
 type Tab = 'start' | 'training' | 'calendar' | 'stats' | 'settings';
 
@@ -33,6 +34,12 @@ export function App() {
     setTimerState(t);
     saveTimer(t);
   };
+
+  // The beeps of the rest timer run as an audio track, so they also come on a locked screen.
+  // The stretching routine plays its own track and takes over while it is open.
+  useEffect(() => {
+    if (flow !== 'stretch') scheduleCues(timer ? timerCues(timer) : [], 'Pause');
+  }, [timer, flow]);
 
   const showDay = (date: string) => {
     setCalendarDay(date);

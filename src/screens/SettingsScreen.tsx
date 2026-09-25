@@ -8,6 +8,7 @@ import { generateTestData, resetEverything } from '../devdata';
 import { isoDate } from '../logic';
 import { exportMarkdown } from '../obsidian';
 import { ExerciseEditor } from './ExerciseEditor';
+import { ProgressionEditor } from './ProgressionEditor';
 import { StretchEditor } from './StretchEditor';
 import { TemplateEditor } from './TemplateEditor';
 
@@ -18,6 +19,7 @@ type View =
   | { kind: 'template'; id: number; planId: number }
   | { kind: 'exercises' }
   | { kind: 'stretches' }
+  | { kind: 'progression' }
   | { kind: 'exercise'; id: number | 'new' };
 
 export function SettingsScreen() {
@@ -54,6 +56,7 @@ export function SettingsScreen() {
   if (view.kind === 'exercise')
     return <ExerciseEditor exerciseId={view.id} onClose={() => setView({ kind: 'exercises' })} />;
   if (view.kind === 'stretches') return <StretchEditor onClose={() => setView({ kind: 'root' })} />;
+  if (view.kind === 'progression') return <ProgressionEditor onClose={() => setView({ kind: 'root' })} />;
 
   const run = async (fn: () => Promise<string>) => {
     try {
@@ -280,6 +283,9 @@ export function SettingsScreen() {
           <button className="list-item chevron" onClick={() => setView({ kind: 'stretches' })}>
             <span className="grow">Dehnplan</span>
             <span className="muted">{stretchCount}</span>
+          </button>
+          <button className="list-item chevron" onClick={() => setView({ kind: 'progression' })}>
+            <span className="grow">Wochenziel &amp; Töne</span>
           </button>
         </div>
       </div>

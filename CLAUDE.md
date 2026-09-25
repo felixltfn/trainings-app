@@ -32,3 +32,19 @@ zum grauen Platzhalter-Icon. `public/manifest.webmanifest` ist deshalb handgesch
 Safari rendert das native Auswahlmenü in einer Serifenschrift und ignoriert CSS — dafür
 gibt es `src/Picker.tsx`. `alert`/`prompt` werden in manchen Umgebungen stillschweigend
 blockiert; Meldungen gehören inline in die Oberfläche (`.banner`).
+
+## Regel 5: Töne nur über die Tonspur in `src/signal.ts`
+
+iOS stoppt JavaScript bei gesperrtem Bildschirm. Nie per Timer/Effect „jetzt piepen“ —
+stattdessen `scheduleCues()` mit Zeitpunkten aufrufen; daraus wird eine Audiospur mit
+eingebauten Tönen. Wiederholte Aufrufe mit denselben Tönen sind ein No-op.
+
+## Testen
+
+- Dev-Server: `preview_start` mit Name `trainings-app` (`.claude/launch.json`, Port 5199).
+- Im Browser-Konsolen-Tool Module direkt importieren: `const { db } = await import('/src/db.ts')`
+  (ebenso `/src/data.ts`, `/src/logic.ts`). Damit alten Zustand herstellen (Meta-Flag löschen,
+  Slot zurücksetzen, ein „gestriges“ Training mit Sätzen anlegen), `location.reload()`, dann auslesen.
+- Danach aufräumen: `db.close(); await db.delete(); localStorage.clear()`.
+- Deploy prüfen ohne `gh` (nicht installiert): `curl -s https://api.github.com/repos/felixltfn/trainings-app/actions/runs?per_page=1`
+  und im Live-Bundle nach einem neuen String greppen.

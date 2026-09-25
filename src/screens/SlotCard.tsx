@@ -1,23 +1,22 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
-import { previousSession } from '../data';
+import { exerciseHistory } from '../data';
 import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet } from '../db';
 import {
   EXERCISE_CHANGE_REST,
   SIDE_LABEL,
-  WEIGHT_STEP,
   fmtClock,
   fmtNum,
   fmtRest,
-  reachedTop,
   sidesOf,
   slotComplete,
   slotRowCount,
   slotTargets,
 } from '../logic';
 import { Picker } from '../Picker';
-import { SetRow, type Prefill, type SetValues } from './SetRow';
+import { isChest, isCompound, weeklyGoal, type ProgressionSettings } from '../progression';
+import { SetRow, type Prefill, type SetLine, type SideValues } from './SetRow';
 
 interface Props {
   slot: Slot;
@@ -26,6 +25,8 @@ interface Props {
   sets: WorkoutSet[]; // all sets of this workout
   partner: string | null; // superset partner label
   partnerSlots: Slot[]; // the other slots of this superset (empty if none)
+  settings: ProgressionSettings;
+  deload: boolean; // this workout lies in a deload week
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMove: (dir: -1 | 1) => void;
@@ -33,7 +34,21 @@ interface Props {
   onSkip: () => void;
 }
 
-export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots, canMoveUp, canMoveDown, onMove, onRest, onSkip }: Props) {
+export function SlotCard({
+  slot,
+  workout,
+  exercises,
+  sets,
+  partner,
+  partnerSlots,
+  settings,
+  deload,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+  onRest,
+  onSkip,
+}: Props) {
   const [showDetails, setShowDetails] = useState(false);
   // Set numbers with a drop set row that isn't saved yet
   const [openDrops, setOpenDrops] = useState<number[]>([]);
@@ -42,7 +57,10 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
 
   const exerciseId = workout.choices[slot.id] ?? slot.exerciseId;
   const ex = exercises.get(exerciseId);
-  const previous = useLiveQuery(() => previousSession(exerciseId, workout), [exerciseId, workout.id, workout.start]);
+  const history = useLiveQuery(
+    async () => (ex ? exerciseHistory(ex, workout, settings) : null),
+    [ex, workout.id, workout.start, settings],
+  );
 
   if (!ex) return null;
 
@@ -54,10 +72,23 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
   // Sets done with another exercise of this slot (after switching) stay visible as a hint
   const otherExercises = [...new Set(sets.filter((s) => s.slotId === slot.id && s.exerciseId !== exerciseId).map((s) => s.exerciseId))];
 
-  const prevSets = previous?.sets ?? [];
+  // The goal is only a suggestion: it prefills the weight, nothing else depends on it
+  const goal = history
+    ? weeklyGoal({
+        ex,
+        targets,
+        compound: isCompound(slot, ex, targets),
+        chest: isChest(ex),
+        history: history.sessions,
+        deload,
+        today: workout.date,
+        bodyweight: history.bodyweight,
+        settings,
+      })
+    : null;
+
+  const prevSets = history?.sessions[0]?.sets ?? [];
   const prevBySide = (side: Side) => prevSets.filter((s) => s.side === side && !s.drop);
-  // Progression: last time every set of this side hit the top of the range -> more weight today
-  const progressed = new Map<Side, boolean>(sides.map((side) => [side, reachedTop(prevBySide(side), ex, targets)]));
 
   const savedSet = (n: number, side: Side, drop: boolean) =>
     mine.find((s) => s.setNumber === n && s.side === side && s.drop === drop);
@@ -66,55 +97,62 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
 
   const prefillFor = (n: number, side: Side, drop: boolean): Prefill => {
     if (drop || cleared.includes(clearKey(n, side, drop))) return { weight: null, value: null };
+    if (goal?.newWeight != null) return { weight: goal.newWeight, value: null };
     const list = prevBySide(side);
     const p = list.find((s) => s.setNumber === n) ?? list[list.length - 1];
     if (!p) return { weight: ex.bodyweight ? 0 : null, value: null };
     // Only the weight is carried over – reps are entered fresh every time
-    if (progressed.get(side)) {
-      const maxWeight = Math.max(...list.map((s) => s.weight));
-      return { weight: maxWeight + WEIGHT_STEP, value: null };
-    }
     return { weight: p.weight, value: null };
   };
 
-  const lastText = (n: number, side: Side): string => {
-    const p = prevBySide(side).find((s) => s.setNumber === n);
-    if (!p) return '';
-    const v = ex.type === 'time' ? `${fmtClock(p.duration ?? 0)} min` : `${p.reps}`;
-    const w = ex.bodyweight && p.weight === 0 ? 'KG' : `${fmtNum(p.weight)} kg`;
-    return `zuletzt ${w} × ${v}`;
+  const linesFor = (n: number, drop: boolean): SetLine[] =>
+    sides.map((side) => ({ side, saved: savedSet(n, side, drop), prefill: prefillFor(n, side, drop) }));
+
+  const lastText = (n: number): string => {
+    const parts = sides.flatMap((side) => {
+      const p = prevBySide(side).find((s) => s.setNumber === n);
+      if (!p) return [];
+      const v = ex.type === 'time' ? `${fmtClock(p.duration ?? 0)} min` : `${p.reps}`;
+      const w = ex.bodyweight && p.weight === 0 ? 'KG' : `${fmtNum(p.weight)} kg`;
+      return [`${side !== 'both' ? `${SIDE_LABEL[side]} ` : ''}${w} × ${v}`];
+    });
+    return parts.length ? `zuletzt ${parts.join(' · ')}` : '';
   };
 
-  const save = async (n: number, side: Side, drop: boolean, v: SetValues) => {
-    const existing = savedSet(n, side, drop);
-    const fields = {
-      weight: v.weight,
-      reps: ex.type === 'time' ? null : v.value,
-      duration: ex.type === 'time' ? v.value : null,
-    };
-    setCleared(cleared.filter((c) => c !== clearKey(n, side, drop)));
-    if (existing) {
-      await db.sets.update(existing.id, fields);
-      return;
-    }
-    const record: Omit<WorkoutSet, 'id'> = {
-      workoutId: workout.id,
-      exerciseId,
-      slotId: slot.id,
-      setNumber: n,
-      side,
-      drop,
-      rir: null,
-      timestamp: Date.now(),
-      ...fields,
-    };
-    const id = await db.sets.add(record);
-    // Start the rest timer once all sides of this row are done
-    const done = new Set(mine.filter((s) => s.setNumber === n && s.drop === drop).map((s) => s.side));
-    done.add(side);
-    if (!sides.every((s) => done.has(s)) || slot.restMin <= 0) return;
+  // All sides of a set are saved in one step; the rest timer starts when something new was added
+  const save = async (n: number, drop: boolean, values: SideValues[]) => {
+    const timestamp = Date.now();
+    const added: WorkoutSet[] = [];
+    await db.transaction('rw', db.sets, async () => {
+      for (const v of values) {
+        const existing = savedSet(n, v.side, drop);
+        const fields = {
+          weight: v.weight,
+          reps: ex.type === 'time' ? null : v.value,
+          duration: ex.type === 'time' ? v.value : null,
+        };
+        if (existing) {
+          await db.sets.update(existing.id, fields);
+          continue;
+        }
+        const record: Omit<WorkoutSet, 'id'> = {
+          workoutId: workout.id,
+          exerciseId,
+          slotId: slot.id,
+          setNumber: n,
+          side: v.side,
+          drop,
+          rir: null,
+          timestamp,
+          ...fields,
+        };
+        added.push({ ...record, id: await db.sets.add(record) });
+      }
+    });
+    setCleared(cleared.filter((c) => !values.some((v) => c === clearKey(n, v.side, drop))));
+    if (added.length === 0 || slot.restMin <= 0) return;
     // Last set of the exercise (and of its superset partners): fixed change-over pause
-    const after = [...sets, { ...record, id }];
+    const after = [...sets, ...added];
     const exerciseDone = [slot, ...partnerSlots].every((s) => {
       const e = exercises.get(workout.choices[s.id] ?? s.exerciseId);
       return !e || slotComplete(s, workout, e, after);
@@ -150,9 +188,6 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
 
   const choose = (id: number) => db.workouts.update(workout.id, { choices: { ...workout.choices, [slot.id]: id } });
 
-  // Today's hint: all planned sets done and at the top of the range
-  const doneNow = sides.every((side) => reachedTop(mine.filter((s) => s.side === side && !s.drop), ex, targets));
-  const progressSides = sides.filter((s) => progressed.get(s));
   const options = [slot.exerciseId, ...slot.alternativeIds];
 
   return (
@@ -189,18 +224,22 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
           Pause <b>{fmtRest(slot.restMin, slot.restMax)}</b>
         </span>
         {partner && <span>Supersatz mit {partner}</span>}
-        {ex.unilateral && <span>einseitig</span>}
+        {ex.unilateral && <span>einseitig, rechts zuerst</span>}
         {ex.bodyweight && <span>KG + Zusatzgewicht</span>}
       </div>
       {ex.note && <p className="small muted">{ex.note}</p>}
 
-      {progressSides.length > 0 && (
-        <div className="hint">
-          ↑ Mehr Gewicht{ex.unilateral ? ` (${progressSides.map((s) => SIDE_LABEL[s]).join(' + ')})` : ''}: letztes
-          Mal oberes Ende erreicht
+      {goal && (
+        <div className="goal">
+          {goal.last && (
+            <>
+              {goal.lastLabel} {goal.last}.{' '}
+            </>
+          )}
+          Ziel heute: <b>{goal.target}</b>.
+          {goal.note && <div className="goal-note">{goal.note}</div>}
         </div>
       )}
-      {doneNow && <div className="hint">✓ Oberes Ende erreicht – nächstes Mal +{fmtNum(WEIGHT_STEP)} kg</div>}
       {otherExercises.length > 0 && (
         <p className="small muted">Auch erfasst: {otherExercises.map((id) => exercises.get(id)?.name).join(', ')}</p>
       )}
@@ -224,34 +263,27 @@ export function SlotCard({ slot, workout, exercises, sets, partner, partnerSlots
           const hasDrop = mine.some((s) => s.setNumber === n && s.drop) || openDrops.includes(n);
           return (
             <div key={`${exerciseId}-${n}`}>
-              {sides.map((side) => (
-                <div key={side}>
-                  <SetRow
-                    label={`${n}${side !== 'both' ? ` ${SIDE_LABEL[side]}` : ''}`}
-                    ariaLabel={`Satz ${n} ${SIDE_LABEL[side]}`}
-                    type={ex.type}
-                    saved={savedSet(n, side, false)}
-                    prefill={prefillFor(n, side, false)}
-                    onSave={(v) => save(n, side, false, v)}
-                  />
-                  <div className="last">{lastText(n, side)}</div>
-                </div>
-              ))}
+              <SetRow
+                label={`${n}`}
+                ariaLabel={`Satz ${n}`}
+                type={ex.type}
+                lines={linesFor(n, false)}
+                onSave={(v) => save(n, false, v)}
+              />
+              <div className="last">{lastText(n)}</div>
 
-              {hasDrop &&
-                sides.map((side) => (
-                  <div key={`drop-${side}`}>
-                    <SetRow
-                      label={`↓${side !== 'both' ? ` ${SIDE_LABEL[side]}` : ''}`}
-                      ariaLabel={`Dropsatz zu Satz ${n} ${SIDE_LABEL[side]}`}
-                      type={ex.type}
-                      saved={savedSet(n, side, true)}
-                      prefill={{ weight: null, value: null }}
-                      onSave={(v) => save(n, side, true, v)}
-                    />
-                    <div className="last">Zusatz mit reduziertem Gewicht</div>
-                  </div>
-                ))}
+              {hasDrop && (
+                <>
+                  <SetRow
+                    label="↓"
+                    ariaLabel={`Dropsatz zu Satz ${n}`}
+                    type={ex.type}
+                    lines={linesFor(n, true)}
+                    onSave={(v) => save(n, true, v)}
+                  />
+                  <div className="last">Zusatz mit reduziertem Gewicht</div>
+                </>
+              )}
 
               {showDetails && (
                 <div className="set-extra">

@@ -490,11 +490,24 @@ textarea.input {
   font-weight: 600;
 }
 
-.hint {
-  margin-top: 10px;
+.goal {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
   font-size: 14px;
-  font-weight: 600;
+  line-height: 1.45;
+}
+
+.goal b {
   color: var(--accent);
+  font-weight: 600;
+}
+
+.goal-note {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-2);
 }
 
 .sets {
@@ -546,6 +559,12 @@ textarea.input {
 
 .num-input.small-font {
   font-size: 18px;
+}
+
+.set-row.multi .done-btn {
+  grid-row: span 2;
+  align-self: stretch;
+  height: auto;
 }
 
 .set-row.time,
@@ -964,6 +983,14 @@ button.banner {
   font-size: 17px;
   line-height: 1.45;
   color: var(--text-2);
+}
+
+.stretch-next {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 16px;
 }
 
 .stretch-controls {

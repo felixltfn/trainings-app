@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { buildBackup, importBackup } from './backup';
+import { getMeta } from './db';
 import { applyPlanFixes, applyStretchFixes, seedIfEmpty, seedStretchesIfEmpty } from './seed';
-import { installAudioUnlock } from './signal';
+import { installAudio, setLockScreenSound } from './signal';
 import './styles.css';
 
 // The service worker activates itself (autoUpdate). As soon as it takes over, the
@@ -37,7 +38,8 @@ async function boot(): Promise<void> {
   await seedStretchesIfEmpty();
   await applyStretchFixes();
   reloadOnUpdate();
-  installAudioUnlock();
+  installAudio();
+  setLockScreenSound((await getMeta<boolean>('lockScreenSound')) ?? true);
   // Test hook for the dev console (not part of the production build)
   if (import.meta.env.DEV) Object.assign(window, { backupTools: { buildBackup, importBackup } });
   createRoot(document.getElementById('root')!).render(

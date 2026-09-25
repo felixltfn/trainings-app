@@ -1,4 +1,5 @@
 import type { Stretch } from './db';
+import type { Cue } from './signal';
 
 export const CHANGE_REST = 5; // standard pause between two rounds (or sides) of one exercise
 export const EXERCISE_REST = 10; // pause before the next exercise
@@ -126,6 +127,26 @@ export function catchUp(run: RunState, steps: Step[], now = Date.now()): Advance
     finished: index >= steps.length,
     stepsPassed,
   };
+}
+
+// Beeps from the current step on: one at the end of an exercise, two when a pause is over
+// and the next round starts. Stops at the first step that waits for "Fertig".
+export function stretchCues(run: RunState, steps: Step[]): Cue[] {
+  if (run.pausedAt !== null) return [];
+  const cues: Cue[] = [];
+  let at = run.stepStartedAt;
+  for (let i = run.index; i < steps.length; i++) {
+    const seconds = steps[i].seconds;
+    if (seconds === null) break;
+    at += seconds * 1000;
+    cues.push({ at, kind: steps[i].kind === 'rest' ? 'go' : 'warn' });
+  }
+  return cues;
+}
+
+// The next exercise round after `index` (skipping pauses), to get into position early
+export function nextExercise(steps: Step[], index: number): Step | null {
+  return steps.slice(index + 1).find((s) => s.kind === 'exercise') ?? null;
 }
 
 export function elapsedSeconds(run: RunState, now = Date.now()): number {

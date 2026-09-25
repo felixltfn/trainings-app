@@ -3,8 +3,18 @@ import { useEffect, useState } from 'react';
 
 import { db } from '../db';
 import { fmtClock, fmtDuration, isoDate } from '../logic';
-import { beep, unlockAudio } from '../signal';
-import { buildSteps, catchUp, elapsedSeconds, loadRun, roundLabel, saveRun, type RunState } from '../stretchRun';
+import { scheduleCues } from '../signal';
+import {
+  buildSteps,
+  catchUp,
+  elapsedSeconds,
+  loadRun,
+  nextExercise,
+  roundLabel,
+  saveRun,
+  stretchCues,
+  type RunState,
+} from '../stretchRun';
 
 interface Props {
   onClose: () => void;
@@ -68,12 +78,19 @@ export function StretchScreen({ onClose }: Props) {
     setDone({ seconds });
   };
 
+  // The beeps run as an audio track, so they also come on a locked screen. Rescheduling with
+  // the same cues is a no-op, so this can follow every change of the run.
+  useEffect(() => {
+    scheduleCues(run && steps.length > 0 ? stretchCues(run, steps) : [], 'Dehnen');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, steps.length]);
+  useEffect(() => () => scheduleCues([]), []);
+
   // Move the run to where it should be now – possibly several steps at once
   useEffect(() => {
     if (!run || steps.length === 0) return;
     const result = catchUp(run, steps, now);
     if (result.stepsPassed === 0 && !result.finished) return;
-    if (result.stepsPassed > 0) beep();
     if (result.finished) {
       finish(run, run.stepStartedAt + (steps[steps.length - 1]?.seconds ?? 0) * 1000);
       return;
@@ -114,7 +131,6 @@ export function StretchScreen({ onClose }: Props) {
         <button
           className="btn block section"
           onClick={() => {
-            unlockAudio();
             const started: RunState = { startedAt: Date.now(), index: 0, stepStartedAt: Date.now(), pausedAt: null };
             setRun(started);
             saveRun(started);
@@ -162,6 +178,8 @@ export function StretchScreen({ onClose }: Props) {
 
   const exercisesTotal = stretches.length;
   const label = roundLabel(step);
+  const upNext = step.kind === 'exercise' ? nextExercise(steps, run.index) : null;
+  const upNextLabel = upNext ? roundLabel(upNext) : '';
 
   return (
     <div className="screen stretch">
@@ -192,6 +210,12 @@ export function StretchScreen({ onClose }: Props) {
             </button>
           ) : null}
           <p className="stretch-note">{step.note}</p>
+          {upNext && (
+            <p className="stretch-next">
+              Danach: <b>{upNext.name}</b>
+              {upNextLabel ? ` · ${upNextLabel}` : ''}
+            </p>
+          )}
         </>
       )}
 

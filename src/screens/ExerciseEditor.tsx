@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 
-import { Picker } from '../Picker';
 import { db, type Exercise } from '../db';
+import { fmtNum, parseNum } from '../logic';
+import { Picker } from '../Picker';
 import { MUSCLES } from '../seed';
 
 interface Props {
@@ -26,6 +27,7 @@ export function ExerciseEditor({ exerciseId, onClose }: Props) {
     [exerciseId],
   );
   const [draft, setDraft] = useState<Omit<Exercise, 'id'> | null>(null);
+  const [stepText, setStepText] = useState<string | null>(null); // raw text while typing "2,"
   const usedCount = useLiveQuery(
     async () => (exerciseId === 'new' ? 0 : db.sets.where('exerciseId').equals(exerciseId).count()),
     [exerciseId],
@@ -104,7 +106,7 @@ export function ExerciseEditor({ exerciseId, onClose }: Props) {
 
         <label className="check section-sm">
           <input type="checkbox" checked={value.unilateral} onChange={(e) => patch({ unilateral: e.target.checked })} />
-          Einseitig (links und rechts getrennt erfassen)
+          Einseitig (rechts und links, ein Häkchen pro Satz)
         </label>
         <label className="check">
           <input type="checkbox" checked={value.bodyweight} onChange={(e) => patch({ bodyweight: e.target.checked })} />
@@ -122,6 +124,20 @@ export function ExerciseEditor({ exerciseId, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        <label className="field">
+          <span>Kleinste Gewichtsstufe an diesem Gerät (kg, leer = Standard aus „Wochenziel“)</span>
+          <input
+            className="input num"
+            inputMode="decimal"
+            value={stepText ?? (value.weightStep ? fmtNum(value.weightStep) : '')}
+            onChange={(e) => {
+              setStepText(e.target.value);
+              const n = parseNum(e.target.value);
+              patch({ weightStep: n !== null && n > 0 ? n : undefined });
+            }}
+          />
+        </label>
 
         <label className="field">
           <span>Ausführungshinweis</span>
