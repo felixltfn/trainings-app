@@ -492,22 +492,17 @@ textarea.input {
 
 .goal {
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-radius: var(--radius);
   background: var(--surface);
   font-size: 14px;
   line-height: 1.45;
+  color: var(--text-2);
 }
 
-.goal b {
+.goal-set {
   color: var(--accent);
   font-weight: 600;
-}
-
-.goal-note {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text-2);
 }
 
 .sets {
@@ -618,6 +613,10 @@ textarea.input {
 }
 
 .last {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 10px;
   font-size: 13px;
   color: var(--text-2);
   text-align: center;

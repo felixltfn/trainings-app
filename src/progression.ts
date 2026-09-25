@@ -1,5 +1,5 @@
 import type { Exercise, Slot, Workout, WorkoutSet } from './db';
-import { fmtClock, fmtNum, parseIsoDate, weekStart, type Targets } from './logic';
+import { fmtNum, parseIsoDate, weekStart, type Targets } from './logic';
 
 // ---------- Settings (editable under Einstellungen → Wochenziel) ----------
 
@@ -90,26 +90,30 @@ export interface GoalInput {
   settings: ProgressionSettings;
 }
 
+// The suggestion for one set. `value` null = no fixed number, `range` is shown instead.
+export interface SetGoal {
+  weight: number | null;
+  value: number | null;
+  range: string | null; // "6–10", "bis 180 s", "RIR 3–4"
+}
+
 export interface Goal {
-  lastLabel: string; // "Letztes Mal" or "Vor dem Deload"
-  last: string | null; // "3 × 8 mit 50 kg"; null before the first session
-  target: string; // "3 × 8 mit 52,5 kg"
+  sets: SetGoal[]; // one entry per suggested set, in set order
   note: string | null;
-  newWeight: number | null; // suggested weight if it differs from last time (prefill of the weight fields)
 }
 
 const sameRows = (a: SessionRow[], b: SessionRow[]) =>
   a.length === b.length && a.every((r, i) => r.weight === b[i].weight && r.value === b[i].value);
 
 // "One more rep": added to the weakest set
-function oneMore(values: number[]): number[] {
-  const i = values.indexOf(Math.min(...values));
-  return values.map((v, j) => (j === i ? v + 1 : v));
+function oneMore(rows: SessionRow[]): SessionRow[] {
+  const i = rows.findIndex((r) => r.value === Math.min(...rows.map((x) => x.value)));
+  return rows.map((r, j) => (j === i ? { ...r, value: r.value + 1 } : r));
 }
 
-// Brings the list to `count` sets: extra sets repeat the last value, surplus sets are dropped
-function fit(values: number[], count: number): number[] {
-  return Array.from({ length: count }, (_, i) => values[Math.min(i, values.length - 1)]);
+// Brings the list to `count` sets: extra sets repeat the last one, surplus sets are dropped
+function fit(rows: SessionRow[], count: number): SessionRow[] {
+  return Array.from({ length: count }, (_, i) => rows[Math.min(i, rows.length - 1)]);
 }
 
 export function stepOf(ex: Exercise, settings: ProgressionSettings): number {
@@ -127,47 +131,27 @@ function increase(weight: number, ex: Exercise, bodyweight: number | null, setti
   return { weight: next, pct };
 }
 
-// Chest slots may grow by one set per calendar week, up to the plan + CHEST_EXTRA_SETS.
-// All other slots keep the planned number of sets.
-function goalSetCount(input: GoalInput, basis: Session, success: boolean): number {
+// Number of sets for the goal. Only chest slots grow: one set per calendar week, up to the
+// plan + CHEST_EXTRA_SETS, and only in a session without a weight increase – one change at a time.
+function goalSetCount(input: GoalInput, basis: Session, grow: boolean): number {
   const planned = input.targets.sets;
   if (!input.chest) return planned;
   const clamp = (n: number) => Math.min(planned + CHEST_EXTRA_SETS, Math.max(planned, n));
   const lastCount = clamp(basis.rows.length);
-  if (!success) return lastCount;
+  if (!grow) return lastCount;
   const monday = weekStart(parseIsoDate(input.today));
   const beforeThisWeek = input.history.find((s) => !s.deload && s.workout.date < monday);
   const base = beforeThisWeek ? clamp(beforeThisWeek.rows.length) : planned;
   return Math.min(planned + CHEST_EXTRA_SETS, base + 1, lastCount + 1);
 }
 
-// ---------- Formatting ----------
-
-function fmtValues(values: number[], ex: Exercise): string {
-  const same = values.every((v) => v === values[0]);
-  const time = ex.type === 'time';
-  const minutes = time && values.some((v) => v >= 60);
-  const one = (v: number) => (minutes ? fmtClock(v) : String(v));
-  const unit = time ? (minutes ? ' min' : ' s') : '';
-  const side = ex.unilateral ? ' je Seite' : '';
-  return same ? `${values.length} × ${one(values[0])}${unit}${side}` : `${values.map(one).join('/')}${unit}${side}`;
-}
-
-function fmtWeight(weights: number[], ex: Exercise): string {
-  const lo = Math.min(...weights);
-  const hi = Math.max(...weights);
-  if (ex.bodyweight && hi === 0) return ex.type === 'time' ? '' : ' mit Körpergewicht';
-  const range = lo === hi ? fmtNum(hi) : `${fmtNum(lo)}–${fmtNum(hi)}`;
-  return ex.bodyweight ? ` mit KG + ${range} kg` : ` mit ${range} kg`;
-}
-
 const fmtRange = (t: Targets, ex: Exercise) => {
-  const unit = ex.type === 'time' ? ' s' : '';
+  const unit = ex.type === 'time' ? ' s' : ' Wdh';
   if (t.repMin === 0) return `bis ${t.repMax}${unit}`;
   return t.repMin === t.repMax ? `${t.repMax}${unit}` : `${t.repMin}–${t.repMax}${unit}`;
 };
 
-const setsWord = (n: number) => `${n} ${n === 1 ? 'Satz' : 'Sätze'}`;
+const exact = (rows: SessionRow[]): SetGoal[] => rows.map((r) => ({ weight: r.weight, value: r.value, range: null }));
 
 // ---------- Calculation ----------
 
@@ -176,79 +160,78 @@ export function weeklyGoal(input: GoalInput): Goal {
   // Deload sessions never count as basis: after the deload the cycle continues
   // from the weight that stood before it.
   const basis = input.history.find((s) => !s.deload && s.rows.length > 0);
-  const lastLabel = input.history[0]?.deload && !input.deload ? 'Vor dem Deload' : 'Letztes Mal';
+  const range = fmtRange(targets, ex);
 
   if (!basis) {
     return {
-      lastLabel,
-      last: null,
-      target: `${setsWord(targets.sets)} im Bereich ${fmtRange(targets, ex)}`,
+      sets: Array.from({ length: targets.sets }, () => ({ weight: null, value: null, range })),
       note: ex.type === 'time' ? 'Erste Einheit – so lange, wie es sauber geht.' : 'Erste Einheit – Startgewicht frei wählen.',
-      newWeight: null,
     };
   }
 
-  const values = basis.rows.map((r) => r.value);
-  const weights = basis.rows.map((r) => r.weight);
-  const topWeight = Math.max(...weights);
-  const last = `${fmtValues(values, ex)}${fmtWeight(weights, ex)}`;
-  const goal = (target: string, note: string | null = null, newWeight: number | null = null): Goal => ({
-    lastLabel,
-    last,
-    target,
-    note,
-    newWeight,
-  });
+  const rows = basis.rows;
+  const values = rows.map((r) => r.value);
+  const planned = targets.sets;
 
   if (input.deload) {
-    const sets = Math.max(1, Math.ceil(targets.sets / 2));
-    return goal(`${setsWord(sets)}${fmtWeight(weights, ex)}, RIR ${DELOAD_RIR}`, 'Deload-Woche: gleiches Gewicht, halbe Sätze, locker bleiben.');
+    const count = Math.max(1, Math.ceil(planned / 2));
+    return {
+      sets: fit(rows, count).map((r) => ({ weight: r.weight, value: null, range: `RIR ${DELOAD_RIR}` })),
+      note: `Deload-Woche: gleiches Gewicht, ${count} statt ${planned} ${planned === 1 ? 'Satz' : 'Sätze'}, locker bleiben.`,
+    };
   }
 
-  const planned = targets.sets;
-  const enoughSets = basis.rows.length >= planned;
+  const enoughSets = rows.length >= planned;
   const noneMissed = values.every((v) => v >= targets.repMin);
-  const sets = goalSetCount(input, basis, enoughSets && noneMissed);
+  const withNote = (sets: SetGoal[], note: string | null = null): Goal => {
+    const extra = sets.length > rows.length && sets.length > planned;
+    const setNote = extra ? 'Heute ein Satz mehr als letztes Mal – mit „+ Satz“ anlegen.' : null;
+    return { sets, note: [note, setNote].filter(Boolean).join(' ') || null };
+  };
 
-  // Time exercises: 5 s more than last time, up to the top of the range
+  // Time exercises: +timeStep seconds per set, up to the top of the range
   if (ex.type === 'time') {
     const atTop = values.every((v) => v >= targets.repMax);
-    const next = fit(values, sets).map((v) => Math.min(targets.repMax, v + settings.timeStep));
-    return goal(
-      `${fmtValues(next, ex)}${fmtWeight(weights, ex)}`,
-      atTop ? 'Obergrenze erreicht – Zeit halten.' : null,
-    );
+    const count = goalSetCount(input, basis, enoughSets && noneMissed && !atTop);
+    const next = fit(rows, count).map((r) => ({ ...r, value: Math.min(targets.repMax, r.value + settings.timeStep) }));
+    return withNote(exact(next), atTop ? 'Obergrenze erreicht – Zeit halten.' : null);
   }
 
   if (input.compound) {
     const previous = input.history.filter((s) => !s.deload && s.rows.length > 0)[1];
-    if (previous && sameRows(basis.rows, previous.rows)) {
-      return goal(
-        `${fmtValues(oneMore(fit(values, sets)), ex)}${fmtWeight(weights, ex)}`,
+    if (previous && sameRows(rows, previous.rows)) {
+      const count = goalSetCount(input, basis, false);
+      return withNote(
+        exact(oneMore(fit(rows, count))),
         'Die Übung steht seit zwei Einheiten. Gewicht halten und eine Wiederholung mehr anpeilen.',
       );
     }
     if (enoughSets && noneMissed) {
-      const up = increase(topWeight, ex, input.bodyweight, settings);
-      const big = up.pct > settings.pctMax;
-      return goal(
-        big
-          ? `${setsWord(sets)} im Bereich ${fmtRange(targets, ex)}${fmtWeight([up.weight], ex)}`
-          : `${fmtValues(fit(values, sets), ex)}${fmtWeight([up.weight], ex)}`,
-        big ? `Kleinste Stufe ist mehr als ${fmtNum(settings.pctMax)} % – weniger Wiederholungen sind normal.` : null,
-        up.weight,
+      // Every set gets heavier by the percentage of its own weight
+      const count = goalSetCount(input, basis, false);
+      const ups = fit(rows, count).map((r) => ({ r, up: increase(r.weight, ex, input.bodyweight, settings) }));
+      // A set whose smallest step is above pctMax gets the range instead of a fixed rep number
+      const big = ({ up }: { up: { pct: number } }) => up.pct > settings.pctMax;
+      return withNote(
+        ups.map((u) => ({ weight: u.up.weight, value: big(u) ? null : u.r.value, range: big(u) ? range : null })),
+        ups.some(big)
+          ? `Wo die kleinste Stufe mehr als ${fmtNum(settings.pctMax)} % ist, sind weniger Wiederholungen normal.`
+          : null,
       );
     }
-    if (!noneMissed) return goal(`${fmtValues(oneMore(fit(values, sets)), ex)}${fmtWeight(weights, ex)}`);
-    return goal(`${fmtValues(fit(values, sets), ex)}${fmtWeight(weights, ex)}`);
+    const count = goalSetCount(input, basis, false);
+    return withNote(exact(noneMissed ? fit(rows, count) : oneMore(fit(rows, count))));
   }
 
   // Isolation: reps first; once every set reaches the top, one weight step up and back to the bottom
   const atTop = enoughSets && values.every((v) => v >= targets.repMax);
   if (atTop) {
-    const next = Math.round((topWeight + stepOf(ex, settings)) * 100) / 100;
-    return goal(`${fmtValues(fit([targets.repMin], sets), ex)}${fmtWeight([next], ex)}`, null, next);
+    const count = goalSetCount(input, basis, false);
+    const step = stepOf(ex, settings);
+    return withNote(
+      fit(rows, count).map((r) => ({ weight: Math.round((r.weight + step) * 100) / 100, value: targets.repMin, range: null })),
+    );
   }
-  const next = fit(values, sets).map((v) => Math.min(targets.repMax, v + 1));
-  return goal(`${fmtValues(next, ex)}${fmtWeight(weights, ex)}`);
+  const count = goalSetCount(input, basis, enoughSets && noneMissed);
+  return withNote(exact(fit(rows, count).map((r) => ({ ...r, value: Math.min(targets.repMax, r.value + 1) }))));
 }

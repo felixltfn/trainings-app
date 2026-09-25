@@ -6,9 +6,9 @@ import { db, type Exercise, type Side, type Slot, type Workout, type WorkoutSet 
 import {
   EXERCISE_CHANGE_REST,
   SIDE_LABEL,
-  fmtClock,
   fmtNum,
   fmtRest,
+  fmtSet,
   sidesOf,
   slotComplete,
   slotRowCount,
@@ -72,7 +72,7 @@ export function SlotCard({
   // Sets done with another exercise of this slot (after switching) stay visible as a hint
   const otherExercises = [...new Set(sets.filter((s) => s.slotId === slot.id && s.exerciseId !== exerciseId).map((s) => s.exerciseId))];
 
-  // The goal is only a suggestion: it prefills the weight, nothing else depends on it
+  // The goal is only a suggestion per set: it prefills the weight, nothing else depends on it
   const goal = history
     ? weeklyGoal({
         ex,
@@ -97,7 +97,8 @@ export function SlotCard({
 
   const prefillFor = (n: number, side: Side, drop: boolean): Prefill => {
     if (drop || cleared.includes(clearKey(n, side, drop))) return { weight: null, value: null };
-    if (goal?.newWeight != null) return { weight: goal.newWeight, value: null };
+    const target = goal?.sets[n - 1];
+    if (target?.weight != null) return { weight: target.weight, value: null };
     const list = prevBySide(side);
     const p = list.find((s) => s.setNumber === n) ?? list[list.length - 1];
     if (!p) return { weight: ex.bodyweight ? 0 : null, value: null };
@@ -112,11 +113,20 @@ export function SlotCard({
     const parts = sides.flatMap((side) => {
       const p = prevBySide(side).find((s) => s.setNumber === n);
       if (!p) return [];
-      const v = ex.type === 'time' ? `${fmtClock(p.duration ?? 0)} min` : `${p.reps}`;
-      const w = ex.bodyweight && p.weight === 0 ? 'KG' : `${fmtNum(p.weight)} kg`;
-      return [`${side !== 'both' ? `${SIDE_LABEL[side]} ` : ''}${w} × ${v}`];
+      const value = (ex.type === 'time' ? p.duration : p.reps) ?? 0;
+      return [`${side !== 'both' ? `${SIDE_LABEL[side]} ` : ''}${fmtSet(p.weight, value, ex)}`];
     });
     return parts.length ? `zuletzt ${parts.join(' · ')}` : '';
+  };
+
+  // Today's suggestion for set n, shown next to "zuletzt"
+  const goalText = (n: number): string => {
+    const g = goal?.sets[n - 1];
+    if (!g) return '';
+    if (g.weight === null) return `Ziel ${g.range ?? ''}`;
+    if (g.value !== null) return `Ziel ${fmtSet(g.weight, g.value, ex)}`;
+    const w = ex.bodyweight && g.weight === 0 ? 'KG' : `${fmtNum(g.weight)} kg`;
+    return `Ziel ${w}, ${g.range ?? ''}`;
   };
 
   // All sides of a set are saved in one step; the rest timer starts when something new was added
@@ -229,17 +239,7 @@ export function SlotCard({
       </div>
       {ex.note && <p className="small muted">{ex.note}</p>}
 
-      {goal && (
-        <div className="goal">
-          {goal.last && (
-            <>
-              {goal.lastLabel} {goal.last}.{' '}
-            </>
-          )}
-          Ziel heute: <b>{goal.target}</b>.
-          {goal.note && <div className="goal-note">{goal.note}</div>}
-        </div>
-      )}
+      {goal?.note && <div className="goal">{goal.note}</div>}
       {otherExercises.length > 0 && (
         <p className="small muted">Auch erfasst: {otherExercises.map((id) => exercises.get(id)?.name).join(', ')}</p>
       )}
@@ -270,7 +270,10 @@ export function SlotCard({
                 lines={linesFor(n, false)}
                 onSave={(v) => save(n, false, v)}
               />
-              <div className="last">{lastText(n)}</div>
+              <div className="last">
+                {lastText(n) && <span>{lastText(n)}</span>}
+                {goalText(n) && <b className="goal-set">{goalText(n)}</b>}
+              </div>
 
               {hasDrop && (
                 <>

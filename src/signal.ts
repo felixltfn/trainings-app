@@ -18,12 +18,13 @@ const RATE = 8000; // Hz – plenty for a beep and keeps the track small (16 KB 
 const MAX_TRACK = 600; // seconds; longer schedules are cut (the next reschedule picks up the rest)
 const DRIFT = 0.75; // seconds the track may be off the clock before it is corrected
 
-// [start offset, length, frequency] of each tone
+// [start offset, length, frequency] of each tone. Mid-range notes that fade out like a
+// chime – less shrill than a flat high beep, still clearly audible on the phone speaker.
 const TONES: Record<CueKind, [number, number, number][]> = {
-  warn: [[0, 0.3, 1320]],
+  warn: [[0, 0.45, 880]], // A5
   go: [
-    [0, 0.22, 1760],
-    [0.34, 0.22, 1760],
+    [0, 0.35, 784], // G5
+    [0.3, 0.5, 1047], // C6 – rising, "go"
   ],
 };
 
@@ -58,7 +59,9 @@ function renderTrack(seconds: number, cues: { offset: number; kind: CueKind }[])
       const count = Math.round(length * RATE);
       for (let i = 0; i < count && first + i < samples.length; i++) {
         const edge = Math.min(1, i / fade, (count - i) / fade);
-        samples[first + i] = Math.round(Math.sin((2 * Math.PI * freq * i) / RATE) * edge * 0.95 * 32767);
+        const decay = Math.exp((-2.5 * i) / count); // soft chime instead of a hard beep
+        const sample = Math.sin((2 * Math.PI * freq * i) / RATE) * edge * decay * 0.95 * 32767;
+        samples[first + i] = Math.max(-32768, Math.min(32767, samples[first + i] + Math.round(sample)));
       }
     }
   }

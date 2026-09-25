@@ -66,6 +66,12 @@ export function fmtTarget(t: Targets, type: Exercise['type']): string {
   return `${t.repMin}–${t.repMax}${unit}`;
 }
 
+// One set as "50 kg × 8" or "10 kg × 0:35 min"; bodyweight without extra load shows "KG"
+export function fmtSet(weight: number, value: number, ex: Exercise): string {
+  const w = ex.bodyweight && weight === 0 ? 'KG' : `${fmtNum(weight)} kg`;
+  return `${w} × ${ex.type === 'time' ? `${fmtClock(value)} min` : value}`;
+}
+
 // ---------- Slot targets (with per-exercise overrides) ----------
 
 export interface Targets {
